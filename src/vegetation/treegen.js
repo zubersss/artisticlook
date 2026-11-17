@@ -114,16 +114,17 @@ export function generateTree(recipe, seed, opts = {}) {
     for (let t = 0; t < tiers; t++) {
       const f = 0.22 + 0.76 * (t / (tiers - 1));
       const y = f * H;
-      const rad = Math.pow(1 - f, 0.85) * R.crownRadius + 0.35;
+      // Cone with a sharp tip: radius falls to ~0.2 m at the top.
+      const rad = Math.pow(1 - f, 0.9) * R.crownRadius + 0.2;
       const per = Math.max(3, Math.round(rad * 2.6));
       for (let k = 0; k < per; k++) {
         const a = (k / per) * Math.PI * 2 + rng.next() * 0.6;
         const c = new THREE.Vector3(Math.cos(a) * rad * 0.55, y - rad * 0.15, Math.sin(a) * rad * 0.55);
         c.x += trunkPts[Math.min(segs, Math.round(f * segs))].x; c.z += trunkPts[Math.min(segs, Math.round(f * segs))].z;
-        clusters.push({ c, r: Math.max(0.7, rad * 0.62), flat: 0.85 });
+        clusters.push({ c, r: Math.max(0.35, rad * 0.62), flat: 1.6 }); // tall clusters overlap the tiers
       }
     }
-    clusters.push({ c: trunkPts[segs].clone().add(new THREE.Vector3(0, -0.4, 0)), r: 0.9, flat: 1 });
+    clusters.push({ c: trunkPts[segs].clone().add(new THREE.Vector3(0, -0.6, 0)), r: 0.4, flat: 1.4 });
   } else {
     // Limbs from the upper trunk, each splitting into secondaries; clusters at tips.
     const nLimbs = R.limbs[0] + rng.int(R.limbs[1] - R.limbs[0] + 1);

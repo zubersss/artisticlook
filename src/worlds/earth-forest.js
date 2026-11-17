@@ -4,7 +4,7 @@
 
 // Shared tree recipes (spread into the variants below).
 const DECIDUOUS = {
-  form: 'deciduous', height: [16, 19], baseRadius: [0.42, 0.5], forkAt: [0.3, 0.38], leanDeg: 5, limbWobble: 0.5,
+  form: 'deciduous', height: [18, 23], baseRadius: [0.42, 0.52], forkAt: [0.36, 0.46], leanDeg: 5, limbWobble: 0.5,
   limbs: [4, 6], limbStart: 0.42, limbTilt: [45, 70], limbLength: [0.42, 0.56], clusterR: [2.4, 3.4], crown: 3,
   nearCards: 250, cardSize: [1.05, 1.45], cells: [0, 1, 2, 3, 4, 5, 6, 7],
   midCards: 72, midCardSize: [2.1, 2.7], midCells: [8, 9, 10, 11, 12, 13, 14, 15],
@@ -88,7 +88,7 @@ export default {
     bloomStrength: 0.09, bloomKnee: 0.7, bloomTint: [1.0, 0.9, 0.75], shaftStrength: 0.5, shaftColor: [1.0, 0.8, 0.5],
     sharpen: 0.35, warpPx: 2.5,
     saturation: 1.1, blackLift: 0.012, liftColor: [1.0, 0.92, 0.82], vignette: 0.26, canvas: 0.045,
-    shadowCool: 0.1, highlightWarm: 0.08, warmTint: [1.06, 1.0, 0.9], contrast: 1.1,
+    shadowCool: 0.03, highlightWarm: 0.08, warmTint: [1.06, 1.0, 0.9], contrast: 1.1,
   },
 
   // --- Terrain recipe ---
@@ -141,7 +141,7 @@ export default {
     lichen: '#a89c6c',
     // Far canopy crowns (lit colours): maple orange, beech gold, red maple, russet oak, aspen, turning green, spruce.
     farForest: ['#e0983a', '#e8c450', '#d0663a', '#c08a4a', '#eaaa40', '#b8b848', '#3a543a'],
-    farForestWeights: [0.24, 0.2, 0.07, 0.14, 0.17, 0.08, 0.10],
+    farForestWeights: [0.25, 0.21, 0.03, 0.15, 0.18, 0.08, 0.10],
     canopyGap: '#6c5634', // umber-olive between crowns
     farFields: '#9aa346',
     ridge: '#7a6a80',
@@ -184,6 +184,7 @@ export default {
       seed: 3141, extent: 330, cell: 8, maxTrees: 2500, densityPower: 1.1,
       clumpScale: 60, mix: 0.25, coniferThreshold: 0.42, scale: [0.6, 1.45],
       groupChance: 0.35, saplings: 0.5, pathGiants: 9, // groups of 2-3, young edges, old trees by the path
+      poles: 0.25, // thin young trees between the mature ones
       bookmarkClearance: 5, heroClearance: 8,
     },
     heroVariant: 0,
@@ -194,7 +195,7 @@ export default {
         palette: { lit: '#e09a2a', mid: '#b8661e', interior: '#5a3c1c', glow: '#e4a419' } },
       { ...DECIDUOUS, name: 'beech-gold', seed: 23, weight: 0.2, neighbour: 4, height: [17, 21], limbTilt: [30, 50], clusterR: [2.0, 2.8],
         palette: { lit: '#f0c840', mid: '#c89422', interior: '#5e4416', glow: '#f2d050' } },
-      { ...DECIDUOUS, name: 'red-maple', seed: 37, weight: 0.1, neighbour: 0, height: [13, 16], clusterR: [1.8, 2.5],
+      { ...DECIDUOUS, name: 'red-maple', seed: 37, weight: 0.04, neighbour: 0, height: [13, 16], clusterR: [1.8, 2.5],
         palette: { lit: '#e2702c', mid: '#ac4a20', interior: '#5a3418', glow: '#f0862c' } },
       { ...DECIDUOUS, name: 'russet-oak', seed: 41, weight: 0.16, neighbour: 0, height: [15, 18], limbTilt: [50, 70], limbLength: [0.42, 0.55], baseRadius: [0.48, 0.58],
         palette: { lit: '#c88c40', mid: '#985a26', interior: '#4a2c16', glow: '#e0a048' } },

@@ -227,9 +227,12 @@ export class Terrain {
                            inout vec3 outCol, inout vec3 outN, inout float outAO) {
           vec2 g = p / cs;
           vec2 cell = floor(g);
-          vec2 o = step(0.5, g - cell) - 1.0;
+          // 2x2 nearest cells normally; 3x3 when crowns are elongated (far, grazing).
+          int span = stretch > 2.4 ? 3 : 2;
+          vec2 o = span == 3 ? vec2(-1.0) : step(0.5, g - cell) - 1.0;
           float best = 1e9; vec2 bc = vec2(0.0); uint bh = 0u; float br = 1.0;
-          for (int j = 0; j < 2; j++) for (int i = 0; i < 2; i++) {
+          for (int j = 0; j < 3; j++) for (int i = 0; i < 3; i++) {
+            if (i >= span || j >= span) continue;
             vec2 cc = cell + o + vec2(float(i), float(j));
             uint h = hashU2(uvec2(ivec2(cc) + 1048576 + int(cs)));
             vec2 jit = vec2(float(h & 255u), float((h >> 8) & 255u)) * (1.0 / 255.0);
@@ -245,7 +248,9 @@ export class Terrain {
             if (dd < best) { best = dd; bc = ctr; bh = h; br = r * lob; }
           }
           // Species in stands (30-80 m) from a smooth field; greens as separate stands.
-          float pick = fract(clump * 1.7 + (hashF(bh) - 0.5) * 0.08);
+          // Far stands are bigger (100-300 m): the far lattice uses a broader species field.
+          float clumpF = cs > 15.0 ? vnoise(bc * (1.0 / 256.0) + 11.0) * 1.2 + clump * 0.3 : clump;
+          float pick = fract(clumpF * 1.7 + (hashF(bh) - 0.5) * 0.08);
           vec3 crown = texelFetch(uCanopyPal, ivec2(int(pick * 0.78 * 63.99), 0), 0).rgb;
           vec2 cc2 = bc * (1.0 / 48.0);
           float greenA = vnoise(cc2 + 77.0) * 0.8 + hashF(bh ^ 0x1234567u) * 0.2;
@@ -261,14 +266,14 @@ export class Terrain {
           float z = sqrt(max(0.0, 1.0 - dot(q, q)));
           vec3 Ns = normalize(N * 0.6 + vec3(q.x, z, q.y));
           float lit = smoothstep(-0.2, 0.9, dot(Ns, uSunDir) + 0.3);
-          crown = mix(chromaScale(crown * vec3(0.6, 0.5, 0.42), 1.15), crown, lit);
+          crown = mix(chromaScale(crown * vec3(0.74, 0.64, 0.54), 1.1), crown * 1.08, lit);
           float sunward = saturate(dot(normalize(q + 1e-4), normalize(uSunDir.xz + 1e-4)));
-          crown = mix(crown, uGlowHue * luma(crown) * 1.8, sunward * smoothstep(0.45, 0.95, best) * 0.6);
+          crown = mix(crown, uGlowHue * luma(crown) * 1.9, sunward * smoothstep(0.4, 0.95, best) * 0.7);
           // Gaps are the canopy's own shadow, not the forest floor.
-          vec3 gapCol = mix(groundAlb, mix(uCanopyGap, crown * vec3(0.55, 0.48, 0.42), 0.5), smoothstep(0.35, 0.75, forest) * exists);
+          vec3 gapCol = mix(groundAlb, mix(uCanopyGap, crown * vec3(0.66, 0.58, 0.5), 0.6), smoothstep(0.35, 0.75, forest) * exists);
           outCol = mix(gapCol, crown, inside);
           outN = normalize(mix(N, Ns, inside));
-          outAO = mix(0.7, mix(0.8, 1.0, z), inside);
+          outAO = mix(0.85, mix(0.88, 1.0, z), inside);
         }
         vec2 gridUv(vec4 g, vec2 xz) { return ((xz - g.xy) / g.z + 0.5) / g.w; }
         vec3 decodeN(vec4 t) { vec2 xz = t.rg * 2.0 - 1.0; return normalize(vec3(xz.x, max(0.05, 1.0 - dot(xz, xz)), xz.y)); }
@@ -333,9 +338,9 @@ export class Terrain {
             float wFar = smoothstep(450.0, 850.0, dist) * (1.0 - smoothstep(3000.0, 5500.0, dist));
             vec3 cA = can, cB = can; vec3 nA = N, nB = N; float aoA = crownAO, aoB = crownAO;
             vec2 rdir = normalize(vRel.xz + 1e-4);
-            float stretch = clamp(1.0 / max(abs(dot(vRel / dist, N)), 0.05), 1.0, 2.5);
-            if (wNear > 0.0) paintedCrowns(wp.xz, 8.0, forest, clump, N, alb, rdir, stretch, cA, nA, aoA);
-            if (wFar > 0.0) paintedCrowns(wp.xz, 22.0, forest, clump, N, alb, rdir, stretch, cB, nB, aoB);
+            float stretch = clamp(1.0 / max(abs(dot(vRel / dist, N)), 0.05), 1.0, 4.0);
+            if (wNear > 0.0) paintedCrowns(wp.xz, 10.0, forest, clump, N, alb, rdir, min(stretch, 2.5), cA, nA, aoA);
+            if (wFar > 0.0) paintedCrowns(wp.xz, 28.0, forest, clump, N, alb, rdir, stretch, cB, nB, aoB);
             float wSum = wNear + wFar;
             if (wSum > 0.0) {
               vec3 cc = (cA * wNear + cB * wFar) / wSum;

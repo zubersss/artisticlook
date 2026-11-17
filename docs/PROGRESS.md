@@ -11,7 +11,7 @@ judging the look only; performance numbers come only from the owner's phone.
 | 2 | Terrain (clipmap, recipe heightfield, path/stream/clearings carving), far hills & ridges, CPU atmosphere LUT sky, aerial perspective + height fog, painter's light | screenshots of all bookmarks; critic rounds (≤ 3) | **done** — 3 critic rounds (log below); CDLOD terrain, CPU atmosphere LUT, painted sky, aerial + ground haze, painter's light, far canopy crowns |
 | 3 | Brushwork on ground and rocks: stroke texture, hex-tiled world-space strokes, 2 octaves, broken colour, flecks, sheen, brushed shadow edges; boulders | critic rounds; stability test | **done** — 3 critic rounds, stability sheets at every bookmark |
 | 4 | One hero tree: trunk/limbs/bark strokes, leaf-dab atlas (coverage-preserving mips), canopy clusters, backlit glow; tuned against references | critic rounds; stability; **phone checkpoint 1** | **done** — 3 critic rounds; stability OK; waiting for phone checkpoint 1 |
-| 5 | Forest: density map placement (1,500–2,500), 6 deciduous + 2 conifer variants, instancing per variant per LOD, near/mid LOD fades, far painted canopy on terrain | critic; stability; overdraw < 2.5 | |
+| 5 | Forest: density map placement (1,500–2,500), 6 deciduous + 2 conifer variants, instancing per variant per LOD, near/mid LOD fades, far painted canopy on terrain | critic; stability; overdraw < 2.5 | **done** — 3 critic rounds; stability OK; overdraw ≤ 1.35 shaded |
 | 6 | Shadows: two cascades (120 m / 900 m), staggered updates, soft + brushed filtering, dappled light | critic; stability; **phone checkpoint 2** | |
 | 7 | Ground dressing (tufts, flowers), stream, clouds, Moon, lander (parallel agents allowed for independent modules) | critic; stability | |
 | 8 | Light shafts tuning, wind sway, falling leaves, finish | critic; stability | |
@@ -245,6 +245,25 @@ conifer cards elongated 1.7:1 and nearly horizontal (drooping tiers), 250/90 car
 painted crowns elongate toward the viewer at grazing angles (round on screen), gaps painted in the
 canopy's own shadow colour; forest-floor AO lighter; clearing bookmark moved in and pitched down.
 
+### Stage 5 (forest), round 3 (final)
+Gaps: (1) eye-level still reads park-like (sky 36–64 % of the top band vs 4–9 % in the path
+paintings), short boles, avenue spacing, one-height clearing wall; (2) crown darks still crimson
+(hue 9–11°), too many red trees from the air (7.5 % vs 1.6–2.7 %); (3) aerial canopy like clay
+relief, crevices too dark, features half size; (4) far painted canopy a striped carpet at eye level
+(dabs 0.24–0.5 % H tall); (5) conifers topiary with black shade sides.
+Changes: taller trees (18–23 m) with longer clear boles (fork 36–46 %), thin pole trees between mature
+ones (25 %), red maple reduced to a rare accent (weight 0.04, far palette 3 %), stronger umber hue
+rotation and higher value floor for crown darks, post shadow-cool grade 0.03; painted crowns larger
+(10 m / 28 m lattices), elongated up to 4× toward the viewer far away (3×3 search), far stands from a
+256 m species field, lighter shaded sides and gaps, brighter caps; conifers as sharp cones (radius
+falls to 0.2 m, tall overlapping tier clusters).
+**Remaining gaps after 3 rounds (carried forward):** the canopy still does not close overhead in
+eye-level views as much as in the path paintings (the brief's tree sizes and 2,500-tree budget over
+600 × 600 m limit density; closing it fully needs bigger near crowns or more trees near the path);
+the far painted forest at eye level is still finer-grained than the paintings' distance strokes;
+conifers at mid distance still a little columnar. Revisit in milestone 2 ("close the biggest gaps").
+Stability: 3-frame sequences at all bookmarks show consistent, smooth edge motion; no boiling.
+
 ## Phone results
 (pasted benchmark results from the owner's S23 Ultra, and the governor changes made)
 
@@ -255,6 +274,7 @@ counts the foliage depth prepass)
 | Stage | path | clearing | backlit | hill | aerial |
 |---|---|---|---|---|---|
 | 3 (ground + 3 hero trees) | 1.09 / 1.10 | 1.03 / 1.05 | 1.10 / 1.23 | 1.18 / 1.18 | 1.00 / 1.00 |
+| 5 (forest, 2,500 trees) | 1.21 / 1.64 | 1.13 / 1.52 | 1.27 / 1.86 | 1.32 / 1.59 | 1.01 / 1.02 |
 | 4 (hero tree final) | 1.10 / 1.10 | 1.03 / 1.05 | 1.09 / 1.18 | 1.18 / 1.18 | 1.00 / 1.00 |
 
 ## Tools

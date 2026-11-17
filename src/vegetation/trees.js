@@ -139,13 +139,13 @@ const COLOR_FRAG = /* glsl */ `
             float shadeW = 1.0 - smoothstep(0.0, 0.5, dot(N, uSunDir) + 0.2);
             vec3 umber = uLeafDeep / max(luma(uLeafDeep), 1e-4);
             float shellW2 = smoothstep(0.75, 1.0, shell);
-            float floorL = litL * mix(0.22, 0.4, shellW2); // outer dabs never read as holes
+            float floorL = litL * mix(0.3, 0.42, shellW2); // outer dabs never read as holes
             col = mix(col, umber * max(L, floorL), max(shadeW * 0.85, 1.0 - smoothstep(0.0, floorL * 1.4, L)));
             // Dark values lean to burnt umber (hue ~30 deg), never crimson.
             vec3 o = toOklab(col);
-            float darkW = 1.0 - smoothstep(0.02, 0.09, luma(col));
+            float darkW = 1.0 - smoothstep(0.03, 0.16, luma(col));
             vec3 ou = toOklab(umber * luma(col));
-            o.yz = mix(o.yz, ou.yz * (length(o.yz) / max(length(ou.yz), 1e-4)), darkW * 0.7);
+            o.yz = mix(o.yz, ou.yz * (length(o.yz) / max(length(ou.yz), 1e-4)), darkW * 0.9);
             col = max(fromOklab(o), vec3(0.0));
           }
           // Backlight. (a) The whole crown transmits warm orange light (wide lobe): the body
@@ -415,6 +415,11 @@ export class Trees {
           const a = rng.next() * Math.PI * 2, rr = rng.range(2.5, 5);
           const x2 = x + Math.cos(a) * rr, z2 = z + Math.sin(a) * rr;
           if (hf.maskAt(x2, z2, 2) > 0.25) cand.push({ x: x2, z: z2, yaw: rng.next() * 6.28, s: s * rng.range(0.6, 0.95), w: rng.range(0.85, 1.25), v, r: rng.next() });
+        }
+        // Thin young pole trees between the mature ones.
+        if (d > 0.5 && rng.next() < (F.poles ?? 0)) {
+          const a = rng.next() * Math.PI * 2, rr = rng.range(2.5, 4.5);
+          cand.push({ x: x + Math.cos(a) * rr, z: z + Math.sin(a) * rr, yaw: rng.next() * 6.28, s: rng.range(0.45, 0.7), w: rng.range(0.7, 0.95), v, r: rng.next() * 0.9 });
         }
         // Saplings and young crowns step the forest edge down.
         if (d > 0.12 && d < 0.55 && rng.next() < (F.saplings ?? 0.5)) {
