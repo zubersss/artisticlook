@@ -268,7 +268,7 @@ export class Heightfield {
    * path inside it and along it at its edges, along the stream, random in litter.
    */
   buildFlow() {
-    const M = NEAR.N / 2, N = NEAR.N;
+    const M = NEAR.N, N = NEAR.N; // 1 m texels (the 2.2 m path needs them)
     const out = new Uint8Array(M * M * 4);
     const path = this.splines.path, stream = this.splines.stream;
     const tangent = (sp, k) => {
@@ -279,7 +279,7 @@ export class Heightfield {
     };
     for (let j = 0; j < M; j++) {
       for (let i = 0; i < M; i++) {
-        const gi = i * 2, gj = j * 2, k = gj * N + gi;
+        const gi = i, gj = j, k = gj * N + gi;
         const x = NEAR.origin + gi, z = NEAR.origin + gj;
         const hx = this.near[gj * N + Math.min(N - 1, gi + 2)] - this.near[gj * N + Math.max(0, gi - 2)];
         const hz = this.near[Math.min(N - 1, gj + 2) * N + gi] - this.near[Math.max(0, gj - 2) * N + gi];
@@ -288,12 +288,13 @@ export class Heightfield {
         let ang = Math.PI * fbm(x / 128, z / 128, 2, 0.5, this.seed + 909) * 0.9;
         let vx = Math.cos(2 * ang), vz = Math.sin(2 * ang);
         // Slopes: along the contours.
-        const ws = smoothstep(0.004, 0.04, gl);
+        const ws = smoothstep(0.02, 0.12, gl); // gentle tops keep the slow noise flow (no rings)
         if (ws > 0) {
           const ca = Math.atan2(hx, -hz);
           vx += (Math.cos(2 * ca) - vx) * ws; vz += (Math.sin(2 * ca) - vz) * ws;
         }
-        let rnd = this.nearMask[k * 4 + 2] / 255; // litter under the forest: random per stroke
+        // Litter under the forest and open meadows: random per stroke (no contour bands).
+        let rnd = Math.max(this.nearMask[k * 4 + 2] / 255, 0.35 * this.nearMask[k * 4 + 3] / 255);
         if (stream && stream.dist[k] < stream.carve.width * 0.5 + stream.carve.bankWidth + 2) {
           const t = tangent(stream, k);
           const w = 1 - smoothstep(stream.carve.width * 0.5 + 1, stream.carve.width * 0.5 + stream.carve.bankWidth + 2, stream.dist[k]);

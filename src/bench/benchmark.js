@@ -81,7 +81,7 @@ export class Benchmark {
         const ground = this.heightAt(out.x, out.z);
         const lift = Math.sin(u * Math.PI) * 25; // hop over the canopy between stops
         out.y = Math.max(catmull(p0.y, a.y, b.y, p3.y, u) + lift, ground + 1.7);
-        out.yaw = lerpAngle(a.yaw, b.yaw, u);
+        out.yaw = ((lerpAngle(a.yaw, b.yaw, u) % 360) + 360) % 360;
         out.pitch = a.pitch + (b.pitch - a.pitch) * u;
         return out;
       }

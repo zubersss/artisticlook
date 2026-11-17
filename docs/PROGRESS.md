@@ -9,7 +9,7 @@ judging the look only; performance numbers come only from the owner's phone.
 |---|---|---|---|
 | 1 | Skeleton: renderer, camera-relative world, HDR target + bloom/shafts/exposure + final pass, governor, HUD, touch/desktop input, bookmarks, basic benchmark, Pages workflow, screenshot/stability/overdraw script | builds; runs headless with no console errors; screenshot script saves every bookmark; workflow present | **done** — placeholder ground/sky through the full HDR chain; tap-to-start, touch look/stick, HUD, benchmark start/stop/report verified headless |
 | 2 | Terrain (clipmap, recipe heightfield, path/stream/clearings carving), far hills & ridges, CPU atmosphere LUT sky, aerial perspective + height fog, painter's light | screenshots of all bookmarks; critic rounds (≤ 3) | **done** — 3 critic rounds (log below); CDLOD terrain, CPU atmosphere LUT, painted sky, aerial + ground haze, painter's light, far canopy crowns |
-| 3 | Brushwork on ground and rocks: stroke texture, hex-tiled world-space strokes, 2 octaves, broken colour, flecks, sheen, brushed shadow edges; boulders | critic rounds; stability test | in progress — stroke texture, hex-lattice world strokes, flow field, broken colour, flecks, sheen, boulders in place |
+| 3 | Brushwork on ground and rocks: stroke texture, hex-tiled world-space strokes, 2 octaves, broken colour, flecks, sheen, brushed shadow edges; boulders | critic rounds; stability test | **done** — 3 critic rounds, stability sheets at every bookmark |
 | 4 | One hero tree: trunk/limbs/bark strokes, leaf-dab atlas (coverage-preserving mips), canopy clusters, backlit glow; tuned against references | critic rounds; stability; **phone checkpoint 1** | |
 | 5 | Forest: density map placement (1,500–2,500), 6 deciduous + 2 conifer variants, instancing per variant per LOD, near/mid LOD fades, far painted canopy on terrain | critic; stability; overdraw < 2.5 | |
 | 6 | Shadows: two cascades (120 m / 900 m), staggered updates, soft + brushed filtering, dappled light | critic; stability; **phone checkpoint 2** | |
@@ -139,8 +139,36 @@ flat ground; exposure key 0.17.
 Also: fixed inverted trunk winding (backlit trunks are now dark with a warm rim); foliage EQUAL-depth
 self-test at startup with automatic LESS-EQUAL + alpha-test fallback.
 
+### Stage 3, round 3 (final)
+Gaps: (1) camouflage look: notched pixel-stepped stroke outlines and dark 1-px seams; (2) grass
+mid-value felt, layers do not read (needs dark underlayer patches and gold accents); (3) path reads
+as gravel (random chip directions, too few leaves, too red, blurred edge); (4) litter in raked
+parallel rows, mid-distance airbrush, aerial contour marbling, an octave seam of double-size
+strokes; (5) rocks unpainted, neutral black shadows.
+Changes: stroke texture dry-brush tails and bristles reduced (≤ 6 %, no notched edges); thin-paint
+darkening softened (no seams); 18 % of grass strokes are a dark shaded-green underlayer, 7 % gold
+accents (#E6D24A); flow field at 1 m texels, path strokes calm (16° jitter) and across the path,
+greyed umber earth (#70604A), leaves 7–22 % in sun pools plus stray leaves on the grass, crisp path
+edge; litter and meadows random per stroke; contour flow only on real slopes (no rings on hill
+tops); radial stroke stretch up to 2.2×; octave cross-fade widened to 0.6 so sizes interleave;
++0.5 mip bias on strokes; rocks lavender-grey, more sky/ground fill, stronger broken colour.
+Stability: 3-frame sequences at every bookmark keep strokes attached; remaining risk is fine
+detail in mid-distance grass at 30–80 m — check on the phone.
+
 ## Phone results
 (pasted benchmark results from the owner's S23 Ultra, and the governor changes made)
 
 ## Overdraw per bookmark
-(from `node scripts/shots.mjs --overdraw`)
+(from `node scripts/shots.mjs --overdraw`; "shaded" = colour-pass fragments per pixel, "all" also
+counts the foliage depth prepass)
+
+| Stage | path | clearing | backlit | hill | aerial |
+|---|---|---|---|---|---|
+| 3 (ground + 3 hero trees) | 1.09 / 1.10 | 1.03 / 1.05 | 1.10 / 1.23 | 1.18 / 1.18 | 1.00 / 1.00 |
+
+## Tools
+- `node scripts/pose-shot.mjs --pose="x,z,eye,yaw,pitch;..." --out="a.jpg;..."` screenshots from
+  arbitrary poses (tuning close-ups).
+- Load-time profile (SwiftShader, CPU side): heightfield ≈ 2.0 s, stroke texture ≈ 0.5 s, sky LUTs
+  ≈ 0.2 s, trees ≈ 0.9 s, shader compile ≈ 0.3 s. Phones are slower on CPU; if loading is too slow,
+  the heightfield build is the first candidate for a worker.

@@ -137,7 +137,7 @@ export class Rocks {
           float moss = smoothstep(0.5, 0.8, N.y + (n.z - 0.5) * 0.5) + smoothstep(0.35, 0.0, vObj.y) * 0.35 * n.w;
           alb = mix(alb, uMossCol, clamp(moss, 0.0, 1.0));
           if (uViewMode > 1.5) {
-            alb = brokenColor(alb, id, 14.0, 0.25, 0.16);
+            alb = brokenColor(alb, id, 22.0, 0.3, 0.18);
             alb = mix(alb * vec3(0.72, 0.74, 0.84), alb, smoothstep(0.08, 0.4, h));
             // Gold flecks on lit tops, moss laid as thick yellow-olive strokes along the top.
             alb = mix(alb, uMossCol * 1.25, smoothstep(0.9, 0.92, id) * top);
@@ -145,7 +145,7 @@ export class Rocks {
           float ao = mix(0.75, 1.0, smoothstep(-0.2, 0.5, vObj.y));
           vec3 col = painterLight(alb, uViewMode > 1.5 ? Ns : N, 1.0, ao);
           // Warm reflected light from the sunlit ground and sky fill: darks stay >= v 0.19.
-          col += alb * (uGroundBounce * 2.5 * saturate(0.5 - N.y) + uSkyZenith * 0.35) * painterK();
+          col += alb * (uGroundBounce * 3.0 * saturate(0.5 - N.y) + uSkyZenith * 0.6) * painterK();
           if (uViewMode > 0.5) col = chromaScale(col, 0.85 + 0.25 * saturate(1.0 - dot(N, uSunDir) * 2.0));
           // Grass grows over the base.
           col = mix(col, painterLight(uGrassBase, vec3(0.0, 1.0, 0.0), 1.0, 0.8), smoothstep(-0.12, -0.3, vObj.y) * 0.85 * painterK());

@@ -66,10 +66,10 @@ export function generateStrokeTexture(N = 512, opt = {}) {
           const load = smooth(0, 0.1, u) * (1.15 - 0.5 * uc) + 0.25 * Math.exp(-(((u - 0.06) / 0.05) ** 2));
           const across = Math.sqrt(Math.max(0, 1 - av ** 2.5)) + 0.07 * Math.exp(-(((av - 0.9) / 0.08) ** 2));
           // Bristle marks only toward the stroke edges and tail; interiors stay close to flat colour.
-          const bristle = 1 - (0.14 * smooth(0.45, 0.95, av) + 0.1 * smooth(0.6, 1, u)) * vnoise1(v * lanes + 0.15 * vnoise1(2 * u * 6, seed + 1) * 4, seed);
+          const bristle = 1 - (0.06 * smooth(0.45, 0.95, av) + 0.04 * smooth(0.6, 1, u)) * vnoise1(v * lanes + 0.15 * vnoise1(2 * u * 6, seed + 1) * 4, seed);
           let mask = smooth(1, 0.82, av) * endFade;
           // Dry-brush tail: bristle lanes break up toward the end of the stroke.
-          const dry = 0.9 * smooth(0.65, 1, u);
+          const dry = 0.35 * smooth(0.8, 1, u);
           if (vnoise1(1.7 * lanes * v + 3.1, seed + 2) < dry) mask *= 0.0;
           if (mask <= 0.001) continue;
           const h = amp * load * across * bristle;

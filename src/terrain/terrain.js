@@ -124,6 +124,7 @@ export class Terrain {
       uLitter: { value: lin(Gd.litter) }, uLitterDark: { value: lin(Gd.litterDark) },
       uPathCol: { value: lin(Gd.path) }, uPathFleck: { value: lin(Gd.pathFleck) }, uPathDark: { value: lin(Gd.pathDark || Gd.path) },
       uCanopyAvg: { value: lin(Gd.canopyAvg || '#b8782e') },
+      uGrassAccent: { value: lin(Gd.grassAccent || Gd.sunGrass) },
       uMoss: { value: lin(Gd.moss) }, uRock: { value: lin(Gd.rock) },
       uFields: { value: lin(Gd.farFields || Gd.dryGrass) }, uRidge: { value: lin(Gd.ridge || Gd.rock) },
       uWet: { value: lin(Gd.wet || '#3a3326') },
@@ -192,7 +193,7 @@ export class Terrain {
         uniform sampler2D uMNear;
         uniform sampler2D uMFar;
         uniform sampler2D uFlow;
-        uniform vec3 uGrassSun, uGrassShade, uGrassDry, uLitter, uLitterDark, uPathCol, uPathFleck, uPathDark, uMoss, uRock, uFields, uRidge, uWet, uCanopyGap, uCanopyAvg;
+        uniform vec3 uGrassSun, uGrassShade, uGrassDry, uLitter, uLitterDark, uPathCol, uPathFleck, uPathDark, uMoss, uRock, uFields, uRidge, uWet, uCanopyGap, uCanopyAvg, uGrassAccent;
         uniform sampler2D uCanopyPal;
         uniform vec4 uGroundMix;
         in vec3 vRel;
@@ -324,23 +325,33 @@ export class Terrain {
               rnd = fl.z * w;
             }
             float jitter = mix(radians(40.0), radians(360.0), rnd);
+            jitter = mix(jitter, radians(16.0), smoothstep(0.3, 0.7, pathM)); // calm strokes across the path
             BrushOut b = brushSample(vRel.xz, dist, theta, jitter, abs(dot(vRel / dist, N)));
             strokeH = b.h;
             // Broken colour per stroke, plus broad colour zones (32 m).
             float hueJ = mix(16.0, 22.0, max(litterW * (1.0 - canopyW), smoothstep(0.2, 0.7, pathM)));
-            // Path: greyed mauve-umber earth; fallen leaves gather in sun pools (4 m noise),
-            // sparse elsewhere; ragged edge one stroke wide; a pale ochre ribbon from afar.
+            // Path: calm earth in broad strokes across it; fallen leaves (~10 %, more in 4 m
+            // sun pools) as gold-orange ovals that drift onto the grass at the edges.
             float pools = smoothstep(0.45, 0.75, vnoise(wp.xz * 0.25 + 19.0));
-            float leafSel = step(1.0 - mix(0.1, 0.55, pools), fract(b.id * 3.31 + 0.17));
-            float pathEdge = smoothstep(0.3, 0.55, pathM + (b.h - 0.5) * 0.5);
-            vec3 pathPaint = mix(mix(uPathDark, uPathFleck * 1.1, leafSel), uPathCol * 1.25, farPath);
+            float leafSel = step(1.0 - mix(0.07, 0.22, pools), fract(b.id * 3.31 + 0.17));
+            float pathEdge = smoothstep(0.42, 0.5, pathM + (b.h - 0.5) * 0.25);
+            vec3 pathPaint = mix(uPathDark, uPathCol * 1.25, farPath);
             alb = mix(alb, pathPaint, pathEdge * smoothstep(0.1, 0.4, pathM));
+            float strayLeaf = step(0.985, fract(b.id * 5.17 + 0.3)) * (1.0 - litterW) * smoothstep(0.0, 0.2, pathM + 0.1);
+            alb = mix(alb, uPathFleck * 1.15, max(leafSel * pathEdge, strayLeaf) * (1.0 - farPath));
             alb = brokenColor(alb, b.id, hueJ * 1.4, 0.22, 0.2);
             // Patch-scale light and dark (4 m and 16 m): lit and shaded families in the grass.
             float patchV = (vnoise(wp.xz * 0.25 + 7.0) - 0.5) * 0.7 + (vnoise(wp.xz * 0.0625 + 3.0) - 0.5) * 0.5;
             alb *= 1.0 + patchV * 0.45;
-            // A darker olive underlayer shows between strokes.
-            alb = mix(alb * vec3(0.55, 0.62, 0.5), alb, smoothstep(0.1, 0.45, b.h));
+            // Layering by stroke: ~18 % of strokes are the dark shaded-green underlayer,
+            // ~7 % are bright gold accents laid on top (grass only).
+            float grassW = (1.0 - litterW) * (1.0 - pathEdge) * (1.0 - canopyW) * (1.0 - wetM);
+            float under = step(fract(b.id * 7.77 + 0.13), 0.18);
+            float accent = step(0.93, fract(b.id * 2.39 + 0.61));
+            alb = mix(alb, uGrassShade * 0.62, under * grassW * 0.85);
+            alb = mix(alb, uGrassAccent, accent * grassW * 0.8);
+            // Thin paint at stroke ends shows a little of the darker layer (no hard seams).
+            alb = mix(alb * vec3(0.8, 0.84, 0.76), alb, smoothstep(0.0, 0.3, b.h));
             // Colour zones at two scales (32 m and 8 m): neighbouring strokes share a family.
             vec2 zn = vnoise4(wp.xz * (1.0 / 32.0) + 91.0).xy - 0.5;
             vec2 zn2 = vnoise4(wp.xz * 0.125 + 47.0).zw - 0.5;

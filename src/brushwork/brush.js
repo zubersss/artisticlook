@@ -38,7 +38,8 @@ vec4 brushOctave(int k, vec2 rel, vec2 dRx, vec2 dRy, float theta, float jitterA
   // Derivatives of the lattice coordinate; rotated per stroke below, so there are no
   // derivative jumps at lattice borders. textureGrad + anisotropic filtering keeps
   // strokes crisp on ground seen at grazing angles without shimmering.
-  vec2 dPx = dRx / hexS, dPy = dRy / hexS;
+  // 1.4x derivatives = +0.5 mip bias: sub-pixel stroke detail is pre-filtered (no shimmer).
+  vec2 dPx = dRx * (1.4 / hexS), dPy = dRy * (1.4 / hexS);
   float lodBase = log2(max(sqrt(length(dPx) * length(dPy)) * 0.5 * uBrush.y, 1e-6));
   lodOut = lodBase;
   vec4 acc = vec4(0.0); float idAcc = 0.0, wsum = 0.0;
@@ -79,7 +80,7 @@ BrushOut brushSample(vec2 rel, float d, float theta, float jitterAmt, float cosI
   float foreshorten = pow(max(cosInc, 0.08), -0.3);
   // Radial stretch: strokes lying on ground seen at grazing angles keep a readable
   // thickness on screen (up to 2x longer along the view direction).
-  float sr = clamp(pow(max(cosInc, 0.05), -0.35), 1.0, 2.0);
+  float sr = clamp(pow(max(cosInc, 0.05), -0.45), 1.0, 2.2);
   vec2 rdir = normalize(rel + vec2(1e-4, 0.0));
   mat2 S = mat2(1.0) + (1.0 / sr - 1.0) * mat2(rdir.x * rdir.x, rdir.x * rdir.y, rdir.x * rdir.y, rdir.y * rdir.y);
   float s = log2(max(uBrush.x * d * foreshorten / 0.5, 1.0));

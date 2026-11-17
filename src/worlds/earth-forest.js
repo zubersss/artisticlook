@@ -111,17 +111,18 @@ export default {
 
   ground: {
     sunGrass: '#a6b648', // sunlit grass: yellow-green (chartreuse once lit)
+    grassAccent: '#e6d24a', // bright gold accent strokes
     shadeGrass: '#4a6a34', // cool deep green
     dryGrass: '#b59a48',
     litter: '#8c5a3a', // rust leaf litter
     litterDark: '#5e4636', // umber
     path: '#b98a4e', // warm ochre
     pathFleck: '#d4924e',
-    pathDark: '#6c5648', // greyed mauve-umber earth under the fallen leaves
+    pathDark: '#70604a', // greyed umber earth under the fallen leaves
     canopyAvg: '#c07e34', // averaged far canopy colour
     moss: '#8a9a36',
-    rock: '#a49678',
-    rockDark: '#76664c',
+    rock: '#b4aca4', // lavender-grey stone
+    rockDark: '#857668',
     lichen: '#a89c6c',
     // Far canopy crowns (lit colours): maple orange, beech gold, red maple, russet oak, aspen, turning green, spruce.
     farForest: ['#e0983a', '#e8c450', '#d0663a', '#c08a4a', '#eaaa40', '#b8b848', '#3a543a'],
@@ -136,8 +137,8 @@ export default {
   brush: {
     textureSize: 512, seed: 1234,
     tileFactor: 0.25, // stroke tile ~= 0.25 x distance -> stroke length ~3-4 % of screen height
-    sharpness: 7, // how decisively overlapping strokes win over each other (flat-colour strokes)
-    octaveFade: 0.35, // fraction of each octave spent cross-fading to the next
+    sharpness: 5, // how decisively overlapping strokes win over each other
+    octaveFade: 0.6, // fraction of each octave spent cross-fading to the next (sizes interleave)
   },
 
   rocks: {
