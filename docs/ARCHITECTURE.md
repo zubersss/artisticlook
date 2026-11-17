@@ -89,6 +89,29 @@ Alpha-to-coverage is therefore confined to the **foliage depth prepass** (colour
 the foliage colour pass uses depth test EQUAL, no discard, no A2C, so it gets early-Z and writes
 distance into alpha like every other material (stage 4/5).
 
+## Brushwork (src/brushwork)
+- `strokes.js`: 512² RGBA8 stroke texture generated at startup (≈0.7 s): three layers (underlayer,
+  body, accents) of bent, tapered, bristled strokes with dry-brush tails, wrap-around tileable;
+  R height, GB normal, A stroke id; CPU mips with majority-id downsampling (ids never averaged).
+- `brush.js` (GLSL, fragment-only chunk): world-space sheared triangle lattice per octave
+  (tile 0.5 m·2^k, lattice cell = tile/2). Each lattice vertex places one stroke with rotation =
+  flow direction + jitter, scale 0.85–1.2, random offset; a pixel blends its triangle's 3 vertices
+  with sharpened height-biased weights. Two octaves cross-fade by straight-line distance and a
+  rotation-invariant foreshortening term (|cos incidence|^-0.3), so strokes stay ~2–4 % of screen
+  height and never re-scale when the camera turns. ≤ 6 `textureGrad` samples (anisotropic 4×),
+  derivatives from world position rotated per stroke (no seams at lattice borders).
+- Lattice origin from JS doubles: `uBrushCam` = (fine xz, 128 m-coarse xz) of the wrapped camera, so
+  octaves ≤ 8 use exact integer lattice offsets — stable at any distance from the world origin.
+- Flow field (heightfield `buildFlow`, 2 m texels, doubled-angle): along contours on slopes, slow
+  noise swirl on flat ground, across the path inside it and along its edges, along the stream,
+  random per stroke in leaf litter; far terrain uses contours from the normal.
+- Terrain use: broken colour per stroke (Oklab hue/chroma/lightness, smooth in id), colour zones at
+  32 m and 8 m, ~2 % borrowed fallen-leaf strokes in grass, ~5 % flecks of shadow hue (shade) or sky
+  hue (light), stroke normals (0.2), faint sun sheen on ridges fading with mip level. Rocks: biplanar
+  (sides along horizontal contours, tops along the ground plane), same rules.
+- World-anchored noise rule: every world-space pattern uses power-of-two periods (m) so it is
+  continuous across the 65 536 m camera wrap.
+
 ## Post / final pass (one full-screen pass at canvas resolution)
 Exposure is read once per vertex (flat varying). Per pixel: distance warp (view-direction
 3D value noise, 2 taps; amount `smoothstep(150 m, 2 km, dist) × ~2.5 px`; rejected when the

@@ -15,7 +15,10 @@ the look, the foundations and 60 fps on a Samsung S23 Ultra, plus a data-only Ma
 - `npm run build` → static site in `dist/` (relative base path; works from any sub-path).
 - `npm run shots` → builds, opens headless Chromium (SwiftShader WebGL 2, 915×412 phone-landscape
   viewport, deviceScaleFactor 2) and saves every bookmark × 3 views to `docs/shots/*.jpg`.
-  Options: `--world=mars`, `--bookmarks=path,hill`, `--views=2`, `--scale=1`, `--out=shots-tmp/x`, `--nobuild`.
+  Options: `--world=mars`, `--bookmarks=path,hill`, `--views=2`, `--scale=1`, `--out=shots-tmp/x`, `--nobuild`,
+  `--hide=trees,rocks` (staged screenshots, e.g. judging ground brushwork without trees).
+- `python3 scripts/stability-sheet.py shots-tmp/stability` → contact sheet of the stability frames
+  (3 frames, 2× crops near/mid/far, consecutive-frame differences: sparkle shows as speckle).
 - `npm run stability` → 3 consecutive frames per bookmark while the camera moves, into
   `shots-tmp/stability/` (compare them: strokes must stay attached, far canopies must not sparkle).
 - `node scripts/shots.mjs --overdraw` → overdraw (shaded fragments per pixel) at each bookmark.
@@ -29,7 +32,7 @@ the look, the foundations and 60 fps on a Samsung S23 Ultra, plus a data-only Ma
 - URL parameters: `world=earth-forest|mars`, `bookmark=path|clearing|backlit|hill|aerial`,
   `view=0|1|2` (raw / painter's light / painted), `time=N` (time-of-day preset), `hud=1`,
   `bench=3|10`, `res=1600` (fixed internal long side), `fps=30`, `quality=auto|max|min`,
-  `msaa=0|2|4`, `shot=1` (deterministic, script-driven).
+  `msaa=0|2|4`, `shot=1` (deterministic, script-driven), `hide=trees,rocks`.
 - Keys: WASD/arrows move, mouse drag look, Space/E up, C/Q down (fly), Shift fast,
   B next bookmark, 1–5 bookmarks, F walk/fly, T time, V view, O quality, H HUD, X overdraw view.
 

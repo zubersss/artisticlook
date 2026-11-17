@@ -95,6 +95,10 @@ export class Engine {
 
     progress('Compiling shaders', 0.7);
     await this.compileAll(progress);
+    if (this.trees) {
+      const ok = this.trees.selfTest(this.renderer, this.caps);
+      if (!ok) console.warn('Foliage EQUAL-depth self-test failed; using LESS-EQUAL + alpha test');
+    }
     await this.calibrate(progress);
     this.ready = true;
     progress('Ready', 1);
@@ -332,7 +336,7 @@ export class Engine {
     const st = this.stats;
     st.w = this.intW; st.h = this.intH; st.gov = this.governor.label();
     st.calls = r.info.render.calls; st.tris = r.info.render.triangles;
-    st.extra = (this.showOverdraw && this.lastOverdraw ? `overdraw ${this.lastOverdraw.toFixed(2)} · ` : '') + `${this.caps.hdr.name} ${this.caps.samples}x` + (this.calibrationMs ? ` · cal ${this.calibrationMs.toFixed(1)}ms` : '') + (this.governor.lastBurst ? ` · burst ${this.governor.lastBurst.toFixed(1)}ms` : '');
+    st.extra = (this.showOverdraw && this.lastOverdraw ? `overdraw ${this.lastOverdraw.toFixed(2)} · ` : '') + `${this.caps.hdr.name} ${this.caps.samples}x` + (this.calibrationMs ? ` · cal ${this.calibrationMs.toFixed(1)}ms` : '') + (this.governor.lastBurst ? ` · burst ${this.governor.lastBurst.toFixed(1)}ms` : '') + (this.trees?.foliageFallback ? ' · foliage LEQ' : '');
   }
 
   /** Called by the loop for every rendered frame during play. */

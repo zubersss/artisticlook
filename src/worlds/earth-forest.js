@@ -67,7 +67,7 @@ export default {
   // --- Post / grade ---
   post: {
     // Auto-exposure maps the clamped log-average to this key (median ~0.40 display).
-    exposureKey: 0.15, exposureMin: -8, exposureMax: 8, exposureTau: 2.0, exposureBias: 0.0, exposureFallback: -1.5,
+    exposureKey: 0.17, exposureMin: -8, exposureMax: 8, exposureTau: 2.0, exposureBias: 0.0, exposureFallback: -1.5,
     // Lottes 2016 curve on the max channel: T(mid) = midOut, T(white) = 1.
     curveA: 1.38, curveD: 0.96, curveMid: 0.18, curveMidOut: 0.21, curveWhite: 10,
     bloomStrength: 0.08, bloomTint: [1.0, 0.9, 0.75], shaftStrength: 0.5, shaftColor: [1.0, 0.8, 0.5],
@@ -116,10 +116,12 @@ export default {
     litter: '#8c5a3a', // rust leaf litter
     litterDark: '#5e4636', // umber
     path: '#b98a4e', // warm ochre
-    pathFleck: '#c47c42',
-    moss: '#7a8a2c',
-    rock: '#9a8f7c',
-    rockDark: '#6a5e4e',
+    pathFleck: '#d4924e',
+    pathDark: '#6c5648', // greyed mauve-umber earth under the fallen leaves
+    canopyAvg: '#c07e34', // averaged far canopy colour
+    moss: '#8a9a36',
+    rock: '#a49678',
+    rockDark: '#76664c',
     lichen: '#a89c6c',
     // Far canopy crowns (lit colours): maple orange, beech gold, red maple, russet oak, aspen, turning green, spruce.
     farForest: ['#e0983a', '#e8c450', '#d0663a', '#c08a4a', '#eaaa40', '#b8b848', '#3a543a'],
@@ -133,8 +135,8 @@ export default {
   // --- Brushwork ---
   brush: {
     textureSize: 512, seed: 1234,
-    tileFactor: 0.21, // stroke tile ~= 0.21 x distance -> stroke length ~3 % of screen height
-    sharpness: 6, // how decisively overlapping strokes win over each other
+    tileFactor: 0.25, // stroke tile ~= 0.25 x distance -> stroke length ~3-4 % of screen height
+    sharpness: 7, // how decisively overlapping strokes win over each other (flat-colour strokes)
     octaveFade: 0.35, // fraction of each octave spent cross-fading to the next
   },
 
@@ -153,12 +155,12 @@ export default {
     variants: [
       {
         name: 'maple-orange', form: 'deciduous', seed: 11, neighbour: 4,
-        height: [16, 19], baseRadius: [0.36, 0.44], forkAt: [0.25, 0.3], leanDeg: 5,
-        limbs: [4, 5], limbStart: 0.32, limbTilt: [32, 52], clusterR: [1.9, 2.8], crown: 2,
+        height: [16, 19], baseRadius: [0.42, 0.5], forkAt: [0.25, 0.3], leanDeg: 5,
+        limbs: [5, 6], limbStart: 0.3, limbTilt: [44, 66], limbLength: [0.4, 0.52], clusterR: [2.1, 3.0], crown: 3,
         nearCards: 250, cardSize: [1.0, 1.4], cells: [0, 1, 2, 3, 4, 5, 6, 7],
         midCards: 70, midCardSize: [2.4, 3.2], midCells: [8, 9, 10, 11, 12, 13, 14, 15],
         palette: { lit: '#e8962a', mid: '#c0601c', interior: '#6a2e12', glow: '#f0b02a' },
-        bark: { base: '#8a6a50', dark: '#5a4a50' }, glow: 1.6,
+        bark: { base: '#8a6a50', dark: '#5a4a50' }, glow: 2.2,
       },
       { name: 'beech-gold', form: 'deciduous', seed: 23, palette: { lit: '#f0cc40', mid: '#d09a22', interior: '#6e4a14', glow: '#f6dc50' } },
       { name: 'red-maple', form: 'deciduous', seed: 37, palette: { lit: '#e0582a', mid: '#b0301e', interior: '#561812', glow: '#f07a2c' } },
@@ -187,7 +189,7 @@ export default {
   bookmarks: [
     { name: 'path', pos: [44, null, -40], yaw: 228, pitch: 3, mode: 'walk' },
     { name: 'clearing', pos: [-78, null, 18], yaw: 105, pitch: 2, mode: 'walk' },
-    { name: 'backlit', pos: [-12, null, 70], yaw: 236, pitch: 9, mode: 'walk' },
+    { name: 'backlit', pos: [-12, null, 70], yaw: 236, pitch: 14, mode: 'walk' },
     { name: 'hill', pos: [-212, null, -208], height: 3.5, yaw: 300, pitch: -2, mode: 'fly' },
     { name: 'aerial', pos: [60, null, 300], height: 200, yaw: 345, pitch: -40, mode: 'fly' },
   ],

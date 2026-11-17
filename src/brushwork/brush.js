@@ -22,7 +22,7 @@ struct BrushOut { float h; vec2 nWorld; float id; float lod; float fleck; };
 mat2 rot2(float a) { float c = cos(a), s = sin(a); return mat2(c, s, -s, c); }
 
 // One octave: 3 lattice samples, weighted. Returns (h, nx, nz) in .xyz and id in .w; weight sum in wsum.
-vec4 brushOctave(int k, vec2 rel, vec2 dRx, vec2 dRy, float theta, float jitterAmt, out float lodOut) {
+vec4 brushOctave(int k, vec2 rel, vec2 dRx, vec2 dRy, float theta, float jitterAmt, mat2 S, out float lodOut) {
   float hexS = 0.25 * exp2(float(k));
   vec2 P; vec2 coarse;
   if (k <= 8) { P = (rel + uBrushCam.xy) / hexS; coarse = uBrushCam.zw / hexS; }
@@ -50,7 +50,9 @@ vec4 brushOctave(int k, vec2 rel, vec2 dRx, vec2 dRy, float theta, float jitterA
     float sc = mix(0.85, 1.2, r.x);
     float ang = theta + (r.y - 0.5) * jitterAmt;
     vec2 c = vec2(float(v.x) + 0.5 * float(v.y), float(v.y));
-    mat2 R = rot2(ang) * (0.5 / sc);
+    // S compresses the stroke shape along the ground-projected view direction (stroke
+    // centres stay world-anchored; only shapes stretch, smoothly with camera position).
+    mat2 R = rot2(ang) * S * (0.5 / sc);
     vec2 uv = R * (P - c) + vec2(r.z, hashF(hsh ^ 0x5bd1e995u));
     vec4 t = textureGrad(uStroke, uv, R * dPx, R * dPy);
     float h = t.r;
@@ -74,18 +76,23 @@ vec4 brushOctave(int k, vec2 rel, vec2 dRx, vec2 dRy, float theta, float jitterA
 // camera looks), so turning the camera never re-scales strokes.
 BrushOut brushSample(vec2 rel, float d, float theta, float jitterAmt, float cosInc) {
   vec2 dRx = dFdx(rel), dRy = dFdy(rel);
-  float foreshorten = pow(max(cosInc, 0.06), -0.3);
+  float foreshorten = pow(max(cosInc, 0.08), -0.3);
+  // Radial stretch: strokes lying on ground seen at grazing angles keep a readable
+  // thickness on screen (up to 2x longer along the view direction).
+  float sr = clamp(pow(max(cosInc, 0.05), -0.35), 1.0, 2.0);
+  vec2 rdir = normalize(rel + vec2(1e-4, 0.0));
+  mat2 S = mat2(1.0) + (1.0 / sr - 1.0) * mat2(rdir.x * rdir.x, rdir.x * rdir.y, rdir.x * rdir.y, rdir.y * rdir.y);
   float s = log2(max(uBrush.x * d * foreshorten / 0.5, 1.0));
   float k0f = floor(s);
   float fr = s - k0f;
   int k0 = int(k0f);
   float lod0, lod1;
-  vec4 a = brushOctave(k0, rel, dRx, dRy, theta, jitterAmt, lod0);
+  vec4 a = brushOctave(k0, rel, dRx, dRy, theta, jitterAmt, S, lod0);
   vec4 r = a;
   float lod = lod0;
   float fw = smoothstep(1.0 - uBrush.w, 1.0, fr);
   if (fw > 0.001) {
-    vec4 c = brushOctave(k0 + 1, rel, dRx, dRy, theta, jitterAmt, lod1);
+    vec4 c = brushOctave(k0 + 1, rel, dRx, dRy, theta, jitterAmt, S, lod1);
     // Height-biased cross-fade: the coarser strokes arrive like paint laid on top.
     float t = clamp((fw - 0.5) * 2.0 + (c.x - a.x) * 0.9 + 0.5, 0.0, 1.0);
     t = smoothstep(0.0, 1.0, t);

@@ -285,10 +285,10 @@ export class Heightfield {
         const hz = this.near[Math.min(N - 1, gj + 2) * N + gi] - this.near[Math.max(0, gj - 2) * N + gi];
         const gl = Math.hypot(hx, hz) / 4;
         // Flat ground: slowly turning noise directions (64 m scale).
-        let ang = Math.PI * fbm(x / 64, z / 64, 2, 0.5, this.seed + 909) * 1.6;
+        let ang = Math.PI * fbm(x / 128, z / 128, 2, 0.5, this.seed + 909) * 0.9;
         let vx = Math.cos(2 * ang), vz = Math.sin(2 * ang);
         // Slopes: along the contours.
-        const ws = smoothstep(0.05, 0.25, gl);
+        const ws = smoothstep(0.004, 0.04, gl);
         if (ws > 0) {
           const ca = Math.atan2(hx, -hz);
           vx += (Math.cos(2 * ca) - vx) * ws; vz += (Math.sin(2 * ca) - vz) * ws;
@@ -302,9 +302,10 @@ export class Heightfield {
         if (path && path.dist[k] < path.carve.width * 0.5 + 2) {
           const t = tangent(path, k);
           const half = path.carve.width * 0.5;
-          // Interior: across the path (flattened leaf dabs in perspective); edges: along it.
+          // Across the path (flattened leaf dabs in perspective); edges lean only 30 deg
+          // toward the path direction so the field never swirls.
           const edge = smoothstep(half - 0.9, half - 0.2, path.dist[k]);
-          const a = t + Math.PI / 2 * (1 - edge) + (fbm(x * 0.5, z * 0.5, 1, 0.5, 5) * 0.35) * (1 - edge);
+          const a = t + Math.PI / 2 - edge * Math.PI / 6;
           const w = 1 - smoothstep(half + 0.5, half + 2, path.dist[k]);
           vx += (Math.cos(2 * a) - vx) * w; vz += (Math.sin(2 * a) - vz) * w; rnd *= 1 - w;
         }

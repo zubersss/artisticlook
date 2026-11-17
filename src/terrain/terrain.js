@@ -122,7 +122,8 @@ export class Terrain {
       uCamLocal: { value: new THREE.Vector3() },
       uGrassSun: { value: lin(Gd.sunGrass) }, uGrassShade: { value: lin(Gd.shadeGrass) }, uGrassDry: { value: lin(Gd.dryGrass) },
       uLitter: { value: lin(Gd.litter) }, uLitterDark: { value: lin(Gd.litterDark) },
-      uPathCol: { value: lin(Gd.path) }, uPathFleck: { value: lin(Gd.pathFleck) },
+      uPathCol: { value: lin(Gd.path) }, uPathFleck: { value: lin(Gd.pathFleck) }, uPathDark: { value: lin(Gd.pathDark || Gd.path) },
+      uCanopyAvg: { value: lin(Gd.canopyAvg || '#b8782e') },
       uMoss: { value: lin(Gd.moss) }, uRock: { value: lin(Gd.rock) },
       uFields: { value: lin(Gd.farFields || Gd.dryGrass) }, uRidge: { value: lin(Gd.ridge || Gd.rock) },
       uWet: { value: lin(Gd.wet || '#3a3326') },
@@ -191,7 +192,7 @@ export class Terrain {
         uniform sampler2D uMNear;
         uniform sampler2D uMFar;
         uniform sampler2D uFlow;
-        uniform vec3 uGrassSun, uGrassShade, uGrassDry, uLitter, uLitterDark, uPathCol, uPathFleck, uMoss, uRock, uFields, uRidge, uWet, uCanopyGap;
+        uniform vec3 uGrassSun, uGrassShade, uGrassDry, uLitter, uLitterDark, uPathCol, uPathFleck, uPathDark, uMoss, uRock, uFields, uRidge, uWet, uCanopyGap, uCanopyAvg;
         uniform sampler2D uCanopyPal;
         uniform vec4 uGroundMix;
         in vec3 vRel;
@@ -233,7 +234,7 @@ export class Terrain {
           // Fallen leaves on the path: a broad warm mottling (individual leaf dabs come from strokes).
           vec3 pathC = mix(uPathCol, uPathFleck, smoothstep(0.45, 0.8, vnoise(wp.xz * 0.5)) * 0.55);
           float farPath = smoothstep(60.0, 300.0, dist);
-          alb = mix(alb, pathC, smoothstep(mix(0.15, 0.03, farPath), mix(0.7, 0.3, farPath), pathM));
+          alb = mix(alb, mix(pathC, uPathCol * 1.25, farPath), smoothstep(mix(0.15, 0.03, farPath), mix(0.7, 0.3, farPath), pathM));
           // Stream bed and wet banks.
           alb = mix(alb, uWet, smoothstep(0.2, 0.9, wetM) * 0.85);
           // Open country beyond the near grid: meadows and fields.
@@ -248,8 +249,9 @@ export class Terrain {
           if (canopyW > 0.0) {
             vec3 Nc = N;
             float clump = vnoise(wp.xz * (1.0 / 32.0)) * 0.55 + vnoise(wp.xz * (1.0 / 128.0) + 7.0) * 0.9;
-            float detail = 1.0 - smoothstep(500.0, 1500.0, dist);
-            vec3 can = texelFetch(uCanopyPal, ivec2(int(fract(clump * 1.7) * 63.99), 0), 0).rgb;
+            float detail = 1.0 - smoothstep(400.0, 1100.0, dist);
+            // Far away: one averaged autumn colour, gently modulated (no hard species zones).
+            vec3 can = oklabJitter(uCanopyAvg, (clump - 0.7) * radians(18.0), 0.0, (vnoise(wp.xz * (1.0 / 64.0) + 3.0) - 0.5) * 0.16);
             float crownAO = 0.62;
             if (detail > 0.0) {
               vec2 p = wp.xz;
@@ -282,7 +284,8 @@ export class Terrain {
               vec2 q = (p - bc) / br;
               // Groves: a crown exists only where the local density allows it.
               float exists = step(hashF(bh ^ 0x2545f491u), smoothstep(0.25, 0.8, forest + (vnoise(bc * 0.03125 + 5.0) - 0.5) * 0.6));
-              float inside = (1.0 - smoothstep(0.82, 1.0, best)) * exists;
+              float aw = max(0.18, fwidth(best) * 1.5);
+              float inside = (1.0 - smoothstep(1.0 - aw, 1.0, best)) * exists;
               float z = sqrt(max(0.0, 1.0 - dot(q, q)));
               vec3 Ns = normalize(N * 0.7 + vec3(q.x, z, q.y));
               Nc = normalize(mix(N, Ns, inside * detail));
@@ -320,30 +323,48 @@ export class Terrain {
               theta = w > 0.5 ? tn : thetaFar;
               rnd = fl.z * w;
             }
-            float jitter = mix(radians(30.0), radians(360.0), rnd);
+            float jitter = mix(radians(40.0), radians(360.0), rnd);
             BrushOut b = brushSample(vRel.xz, dist, theta, jitter, abs(dot(vRel / dist, N)));
             strokeH = b.h;
             // Broken colour per stroke, plus broad colour zones (32 m).
             float hueJ = mix(16.0, 22.0, max(litterW * (1.0 - canopyW), smoothstep(0.2, 0.7, pathM)));
-            alb = brokenColor(alb, b.id, hueJ, 0.22, 0.1);
-            alb *= 0.88 + 0.24 * b.h; // thicker paint catches more light
+            // Path: greyed mauve-umber earth; fallen leaves gather in sun pools (4 m noise),
+            // sparse elsewhere; ragged edge one stroke wide; a pale ochre ribbon from afar.
+            float pools = smoothstep(0.45, 0.75, vnoise(wp.xz * 0.25 + 19.0));
+            float leafSel = step(1.0 - mix(0.1, 0.55, pools), fract(b.id * 3.31 + 0.17));
+            float pathEdge = smoothstep(0.3, 0.55, pathM + (b.h - 0.5) * 0.5);
+            vec3 pathPaint = mix(mix(uPathDark, uPathFleck * 1.1, leafSel), uPathCol * 1.25, farPath);
+            alb = mix(alb, pathPaint, pathEdge * smoothstep(0.1, 0.4, pathM));
+            alb = brokenColor(alb, b.id, hueJ * 1.4, 0.22, 0.2);
+            // Patch-scale light and dark (4 m and 16 m): lit and shaded families in the grass.
+            float patchV = (vnoise(wp.xz * 0.25 + 7.0) - 0.5) * 0.7 + (vnoise(wp.xz * 0.0625 + 3.0) - 0.5) * 0.5;
+            alb *= 1.0 + patchV * 0.45;
+            // A darker olive underlayer shows between strokes.
+            alb = mix(alb * vec3(0.55, 0.62, 0.5), alb, smoothstep(0.1, 0.45, b.h));
+            // Colour zones at two scales (32 m and 8 m): neighbouring strokes share a family.
             vec2 zn = vnoise4(wp.xz * (1.0 / 32.0) + 91.0).xy - 0.5;
-            alb = oklabJitter(alb, zn.x * radians(10.0), 0.0, zn.y * 0.12);
+            vec2 zn2 = vnoise4(wp.xz * 0.125 + 47.0).zw - 0.5;
+            alb = oklabJitter(alb, zn.x * radians(12.0) + zn2.x * radians(10.0), zn2.y * 0.25, zn.y * 0.14 + zn2.y * 0.08);
             // ~2 % of strokes borrow a neighbouring material: fallen leaves in grass.
+            // (borrowing happens before lighting; flecks after it)
             float borrow = smoothstep(0.925, 0.932, b.id) * (1.0 - smoothstep(0.94, 0.945, b.id));
             alb = mix(alb, uPathFleck * 1.1, borrow * (1.0 - litterW) * (1.0 - canopyW) * 0.8);
-            Ns = normalize(N + 0.3 * uPainter.w * vec3(b.nWorld.x, 0.0, b.nWorld.y));
-            ao *= 0.86 + 0.14 * b.h;
-            strokeFleck = b.fleck;
+            Ns = normalize(N + 0.2 * uPainter.w * vec3(b.nWorld.x, 0.0, b.nWorld.y));
+            ao *= 0.94 + 0.06 * b.h;
+            strokeFleck = smoothstep(0.895, 0.905, b.id); // ~5 % of strokes once blended
             sheenW = smoothstep(0.55, 0.85, b.h) * saturate(1.0 - (b.lod - 1.0) / 3.0);
           }
           vec3 col = painterLight(alb, Ns, 1.0, ao);
           if (uViewMode > 1.5) {
-            // Flecks: ~5 % of strokes pick up the shadow hue (in shade) or sky hue (in light).
+            // Flecks: dark blue-green shadow strokes in shade; warm lit dabs (and a few cool
+            // sky notes) in light.
             float litE = saturate(dot(N, uSunDir) * 2.5);
-            vec3 sh = uShadowHue / max(luma(uShadowHue), 1e-4) * luma(col);
-            vec3 sk = uSkyZenith / max(luma(uSkyZenith), 1e-4) * luma(col);
-            col = mix(col, mix(sh, sk, litE), strokeFleck * mix(0.4, 0.22, litE));
+            vec3 sh = uShadowHue / max(luma(uShadowHue), 1e-4) * luma(col) * 0.6;
+            sh = mix(sh, vec3(0.06, 0.12, 0.1) * luma(col) * 4.0, 0.5);
+            float coolNote = step(0.97, fract(strokeH * 7.3 + 0.5));
+            vec3 sk = mix(uGlowHue / max(luma(uGlowHue), 1e-4) * luma(col) * 1.35,
+                          uSkyZenith / max(luma(uSkyZenith), 1e-4) * luma(col), coolNote);
+            col = mix(col, mix(sh, sk, litE), strokeFleck * 0.55);
             // Faint sheen on stroke ridges toward the Sun (strongest at grazing backlight).
             vec3 V = -vRel / dist;
             vec3 Hh = normalize(uSunDir + V);

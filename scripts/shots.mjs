@@ -74,7 +74,7 @@ async function main() {
     if (failed) { console.log('LOAD FAILED:', failed); for (const e of errors) console.log('  ' + e.slice(0, 3000)); process.exit(2); }
     const info = await page.evaluate(() => window.__app.info());
     const bms = args.bookmarks ? String(args.bookmarks).split(',') : info.bookmarks;
-    console.log(`${world}: renderer ${info.caps.renderer} hdr ${info.caps.hdr.name} msaa ${info.caps.samples} internal ${info.intW}x${info.intH} canvas ${info.outW}x${info.outH}`);
+    console.log(`${world}: renderer ${info.caps.renderer} hdr ${info.caps.hdr.name} msaa ${info.caps.samples} internal ${info.intW}x${info.intH} canvas ${info.outW}x${info.outH} foliage ${JSON.stringify(info.foliage)}`);
     for (const b of bms) {
       if (args.overdraw) {
         const od = await page.evaluate((b) => { window.__app.setBookmark(b); window.__app.setView(2); window.__app.renderFrames(2); return window.__app.overdraw(); }, b);

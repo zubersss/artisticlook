@@ -41,7 +41,7 @@ function addTube(out, pts, radii, sides, level, vStart, flare) {
   }
   for (let i = 0; i < n - 1; i++) for (let s = 0; s < sides; s++) {
     const a = base + i * (sides + 1) + s, b2 = a + sides + 1;
-    out.idx.push(a, b2, a + 1, a + 1, b2, b2 + 1);
+    out.idx.push(a, a + 1, b2, a + 1, b2 + 1, b2); // CCW seen from outside
   }
 }
 
@@ -112,7 +112,8 @@ export function generateTree(recipe, seed) {
       const ang = (l / nLimbs) * Math.PI * 2 + rng.range(-0.4, 0.4);
       const tilt = rng.range(R.limbTilt[0], R.limbTilt[1]) * Math.PI / 180;
       const dir = new THREE.Vector3(Math.cos(ang) * Math.sin(tilt), Math.cos(tilt), Math.sin(ang) * Math.sin(tilt));
-      const len = H * rng.range(0.32, 0.45) * (1 - (f - R.limbStart) * 0.5);
+      const ll = R.limbLength ?? [0.32, 0.45];
+      const len = H * rng.range(ll[0], ll[1]) * (1 - (f - R.limbStart) * 0.5);
       const pts = branchPoints(p0, dir, len, 5, 0.35, rng, 0.25);
       const r0 = trunkR[idx] * rng.range(0.5, 0.65);
       addTube(out, pts, pts.map((_, i) => r0 * (1 - 0.75 * i / (pts.length - 1))), 6, 1, 0);

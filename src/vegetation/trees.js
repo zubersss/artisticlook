@@ -24,6 +24,7 @@ in vec4 aTint;   // random, random, random, shell depth (r / R)
 uniform float uRankCut;
 uniform vec4 uLodFade;  // x in-start, y in-end, z out-start, w out-end (m)
 uniform float uCardScale;
+uniform vec4 uCrown;     // whole-crown centre (tree-local) and radius
 out vec2 vUv;
 out vec3 vRel;
 out vec3 vSN;            // sphere normal (world)
@@ -52,7 +53,11 @@ void main() {
   vec2 cell = vec2(mod(aCard.x, 4.0), floor(aCard.x / 4.0));
   vUv = (cell + 0.5 + aCorner * 0.47) * 0.25;
   vRel = c.xyz;
-  vSN = normalize(c.xyz - cc + 1e-4);
+  // Normal: cluster sphere blended with the whole crown, so clusters merge into one
+  // lit mass with a shaded underside instead of separate cotton balls.
+  vec3 crownC = (M * vec4(uCrown.xyz, 1.0)).xyz;
+  vec3 crownN = normalize(c.xyz - crownC + 1e-4);
+  vSN = normalize(mix(normalize(c.xyz - cc + 1e-4), crownN, 0.55));
   vTint = aTint;
   vCell = aCard.x;
   // Transmission through the cluster toward the Sun (per card).
@@ -60,8 +65,38 @@ void main() {
   float b = dot(pc, uSunDir);
   float q = dot(pc, pc) - R * R;
   float chord = max(0.0, -b + sqrt(max(b * b - q, 0.0)));
-  vGlow = vec4(vec3(exp(-0.4 * chord)), aTint.w);
+  float crownDepth = clamp(length(c.xyz - crownC) / (uCrown.w * sc), 0.0, 1.0);
+  // Painted leaves are thin: light carries a long way through a crown, strongest at its rim.
+  vGlow = vec4(vec3(exp(-0.22 * chord) * mix(0.6, 1.25, smoothstep(0.45, 0.95, crownDepth))), aTint.w * mix(0.55, 1.0, smoothstep(0.35, 0.85, crownDepth)));
 }`;
+
+function crownOf(clusters) {
+  const c = new THREE.Vector3();
+  let w = 0;
+  for (const k of clusters) { c.addScaledVector(k.c, k.r * k.r); w += k.r * k.r; }
+  c.multiplyScalar(1 / w);
+  let r = 0;
+  for (const k of clusters) r = Math.max(r, k.c.distanceTo(c) + k.r);
+  return new THREE.Vector4(c.x, c.y, c.z, r);
+}
+
+function buildTestCard() {
+  const g = new THREE.BufferGeometry();
+  const V = 8, pos = [], corner = [], cl = [], card = [], tint = [], idx = [];
+  for (let i = 0; i < V; i++) {
+    const a = (i / V) * Math.PI * 2 + Math.PI / 8;
+    pos.push(0, 0, 0); corner.push(Math.cos(a) * 1.04, Math.sin(a) * 1.04);
+    cl.push(0, 0, -1, 2); card.push(0, 0, 3, 0); tint.push(0.5, 0.5, 0.5, 1);
+  }
+  for (let i = 1; i < V - 1; i++) idx.push(0, i, i + 1);
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aCorner', new THREE.Float32BufferAttribute(corner, 2));
+  g.setAttribute('aCluster', new THREE.Float32BufferAttribute(cl, 4));
+  g.setAttribute('aCard', new THREE.Float32BufferAttribute(card, 4));
+  g.setAttribute('aTint', new THREE.Float32BufferAttribute(tint, 4));
+  g.setIndex(idx);
+  return g;
+}
 
 export class Trees {
   constructor(engine, hf) {
@@ -102,6 +137,9 @@ export class Trees {
       uNbMid: { value: lin(nb.mid) },
       uGlowK: { value: rec.glow ?? 1.0 },
       uCamRight: { value: new THREE.Vector3() }, uCamUp: { value: new THREE.Vector3() },
+      uForceOpaque: { value: 0 }, // self-test: treat dabs as opaque
+      uCrown: { value: crownOf(tree.clusters) },
+      uColorAlphaTest: { value: 0 }, // fallback when EQUAL depth is unreliable on a driver
     };
     this.uniforms = uniforms;
     const a2c = this.samples > 0;
@@ -115,9 +153,10 @@ export class Trees {
       vertex: CARD_VERT,
       fragment: /* glsl */ `
         uniform sampler2D tDabs;
+        uniform float uForceOpaque;
         in vec2 vUv;
         void main() {
-          float a = texture(tDabs, vUv).r;
+          float a = max(texture(tDabs, vUv).r, uForceOpaque);
 #ifdef A2C
           if (uOverdraw > 0.5) { if (a < 0.5) discard; fragColor = vec4(1.0 / 255.0); return; }
           // Sharpen alpha to ~1 px so coverage is crisp but antialiased.
@@ -142,6 +181,7 @@ export class Trees {
         uniform vec3 uLeafLit, uLeafMid, uLeafDeep, uLeafGlow, uNbMid;
         uniform float uGlowK;
         uniform vec3 uCamRight, uCamUp;
+        uniform float uForceOpaque, uColorAlphaTest;
         in vec2 vUv;
         in vec3 vRel;
         in vec3 vSN;
@@ -155,6 +195,8 @@ export class Trees {
         }
         void main() {
           vec4 t = texture(tDabs, vUv);
+          t.r = max(t.r, uForceOpaque);
+          if (uColorAlphaTest > 0.5 && t.r < 0.5) discard;
           float d = length(vRel);
           vec3 V = -vRel / d;
           float shell = vGlow.a;
@@ -163,17 +205,23 @@ export class Trees {
           // hue +-8 deg and value +-12 % per dab, interiors deepen in colour (not grey).
           float id = fract(t.g + vTint.x);
           vec3 alb = vTint.y < 0.12 ? uNbMid : uLeafMid;
-          alb = mix(alb, uLeafLit, smoothstep(0.55, 1.0, shell) * 0.5);
+          // Sun-facing parts of the crown take the lit (gold-orange) colour.
+          float sunFace = smoothstep(-0.15, 0.6, dot(vSN, uSunDir));
+          alb = mix(alb, uLeafLit, saturate(sunFace * 0.75 + smoothstep(0.7, 1.0, shell) * 0.25));
           alb = oklabJitter(alb, (id - 0.5) * radians(16.0), 0.1 * cos(6.2831 * id * 2.0), (fract(id * 3.7) - 0.5) * 0.24);
           alb = mix(uLeafDeep, alb, mix(0.35, 1.0, ao));
           // Soft volume normal: cluster sphere, a little toward the viewer, plus dab relief.
           float dhx = dFdx(t.a), dhy = dFdy(t.a);
           vec3 N = normalize(mix(vSN, V, 0.2) - (dhx * uCamRight + dhy * uCamUp) * 3.0);
           vec3 col = painterLight(alb, N, 1.0, ao);
+          // Canopy interiors stay deep and saturated (umber-red), never grey-brown.
+          if (uViewMode > 0.5) col = chromaScale(col, 1.0 + 0.45 * (1.0 - ao) + 0.15 * (1.0 - saturate(dot(N, uSunDir) + 0.3)));
           // Backlit glow: strongest effect of the references. Thin edges glow most.
           float mu = dot(-V, uSunDir);
           float edge = 1.0 - t.b;
-          vec3 glow = luma(uSunColor) * uLeafGlow * uGlowK * phaseLeaf(mu) * vGlow.rgb * mix(0.7, 1.2, edge);
+          // Glow lives on the outer shell and thin dab edges; the body stays orange.
+          float shellW = smoothstep(0.6, 1.0, shell);
+          vec3 glow = luma(uSunColor) * uLeafGlow * uGlowK * phaseLeaf(mu) * vGlow.rgb * mix(0.6, 1.25, edge) * mix(0.45, 1.0, shellW);
           col += glow * mix(0.5, 1.0, painterK());
           col = applyAerial(col, vRel, d);
           if (uOverdraw > 0.5) { fragColor = vec4(1.0 / 255.0); return; }
@@ -262,6 +310,67 @@ export class Trees {
     engine.onBeforeRender.push((cam) => {
       cam.matrixWorld.extractBasis(uniforms.uCamRight.value, uniforms.uCamUp.value, this._fwd || (this._fwd = new THREE.Vector3()));
     });
+  }
+
+  /**
+   * Startup self-test: draw one opaque card with the depth prepass and the EQUAL colour
+   * pass into a tiny target with the scene's format and MSAA, read it back. If the colour
+   * pass wrote nothing, this driver does not keep the two passes' depths identical: fall
+   * back to a LESS-EQUAL colour pass with an alpha test (slower, always correct).
+   */
+  selfTest(renderer, caps) {
+    // RGBA8 so readback is always allowed; invariance depends on depth, not the colour format.
+    const rt = new THREE.WebGLRenderTarget(16, 16, { format: THREE.RGBAFormat, type: THREE.UnsignedByteType, samples: caps.samples, depthBuffer: true });
+    const g = buildTestCard();
+    const scene = new THREE.Scene();
+    const pre = new THREE.InstancedMesh(g, this.materials.prepass, 1);
+    const col = new THREE.InstancedMesh(g, this.materials.color, 1);
+    // Camera-relative convention: the camera stays at the origin, the card moves.
+    const m = new THREE.Matrix4().makeTranslation(0, 0, -6);
+    pre.setMatrixAt(0, m); col.setMatrixAt(0, m);
+    pre.renderOrder = 0; col.renderOrder = 1;
+    pre.frustumCulled = col.frustumCulled = false;
+    scene.add(pre, col);
+    const cam = new THREE.PerspectiveCamera(40, 1, 0.25, 100);
+    cam.position.set(0, 0, 0); cam.lookAt(0, 0, -1); cam.updateMatrixWorld();
+    this.uniforms.uForceOpaque.value = 1;
+    const fade = this.uniforms.uLodFade.value.clone();
+    this.uniforms.uLodFade.value.set(-1, 0, 1e5, 1e5 + 1);
+    const px = new Uint8Array(16 * 16 * 4);
+    const count = () => {
+      renderer.setRenderTarget(rt);
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear(true, true, false);
+      renderer.render(scene, cam);
+      renderer.setClearColor(0x000000, 1);
+      renderer.readRenderTargetPixels(rt, 0, 0, 16, 16, px);
+      let lit = 0;
+      for (let i = 0; i < 16 * 16; i++) if (px[i * 4] !== 0 || px[i * 4 + 1] !== 0 || px[i * 4 + 2] !== 0) lit++;
+      return lit;
+    };
+    let ok = true;
+    try {
+      // Reference: colour pass with depth test ALWAYS (must draw), then the real EQUAL pass.
+      const df = this.materials.color.depthFunc;
+      this.materials.color.depthFunc = THREE.AlwaysDepth;
+      const ref = count();
+      this.materials.color.depthFunc = df;
+      const lit = count();
+      this.selfTestLit = [lit, ref];
+      ok = ref < 16 || lit >= ref * 0.5; // inconclusive reference -> keep EQUAL
+    } catch (e) {
+      this.selfTestError = String(e);
+    }
+    this.uniforms.uForceOpaque.value = 0;
+    this.uniforms.uLodFade.value.copy(fade);
+    if (!ok) {
+      this.materials.color.depthFunc = THREE.LessEqualDepth;
+      this.uniforms.uColorAlphaTest.value = 1;
+      this.foliageFallback = true;
+    }
+    rt.dispose(); g.dispose();
+    renderer.setRenderTarget(null);
+    return ok;
   }
 
   applyQuality(state) {

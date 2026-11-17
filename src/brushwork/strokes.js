@@ -64,8 +64,9 @@ export function generateStrokeTexture(N = 512, opt = {}) {
           const endFade = Math.min(1, Math.max(0, u / 0.05), Math.max(0, (1.04 - u) / 0.08));
           if (endFade <= 0) continue;
           const load = smooth(0, 0.1, u) * (1.15 - 0.5 * uc) + 0.25 * Math.exp(-(((u - 0.06) / 0.05) ** 2));
-          const across = Math.sqrt(Math.max(0, 1 - av ** 2.5)) + 0.18 * Math.exp(-(((av - 0.9) / 0.08) ** 2));
-          const bristle = 0.7 + 0.3 * vnoise1(v * lanes + 0.15 * vnoise1(2 * u * 6, seed + 1) * 4, seed);
+          const across = Math.sqrt(Math.max(0, 1 - av ** 2.5)) + 0.07 * Math.exp(-(((av - 0.9) / 0.08) ** 2));
+          // Bristle marks only toward the stroke edges and tail; interiors stay close to flat colour.
+          const bristle = 1 - (0.14 * smooth(0.45, 0.95, av) + 0.1 * smooth(0.6, 1, u)) * vnoise1(v * lanes + 0.15 * vnoise1(2 * u * 6, seed + 1) * 4, seed);
           let mask = smooth(1, 0.82, av) * endFade;
           // Dry-brush tail: bristle lanes break up toward the end of the stroke.
           const dry = 0.9 * smooth(0.65, 1, u);
@@ -86,6 +87,16 @@ export function generateStrokeTexture(N = 512, opt = {}) {
   for (let i = 0; i < N * N; i++) if (H[i] > mx) mx = H[i];
   for (let i = 0; i < N * N; i++) H[i] /= mx || 1;
 
+  // Soften the relief (3x3 blur, wrap) so normals carry stroke shapes, not pixel grain.
+  {
+    const T = new Float32Array(N * N);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      let a = 0;
+      for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) a += H[((y + j + N) % N) * N + ((x + i + N) % N)] * (i === 0 && j === 0 ? 4 : (i === 0 || j === 0 ? 2 : 1));
+      T[y * N + x] = a / 16;
+    }
+    H.set(T);
+  }
   // Level 0 normals (wrap-around Sobel), scaled for ~25-35 degree typical slopes.
   const slope = opt.normalStrength ?? 4.0;
   const levels = [];

@@ -40,8 +40,10 @@ async function main() {
   engine.loop = loop;
   engine.onContextLost = () => { loop.stop(); ui.showContextLost(); };
 
+  const t0 = performance.now();
+  window.__loadTimes = [];
   try {
-    await engine.init((text, frac) => ui.setLoading(text, frac));
+    await engine.init((text, frac) => { window.__loadTimes.push([text, Math.round(performance.now() - t0)]); ui.setLoading(text, frac); });
   } catch (e) {
     console.error(e);
     ui.setLoading(`Sorry — ${e.message}`, 0);

@@ -48,7 +48,7 @@ export function measureOverdraw(engine, readback = true, includePrepass = false)
 export function installDebugApi(engine, loop) {
   const api = {
     get ready() { return engine.ready; },
-    info: () => ({ caps: engine.caps, intW: engine.intW, intH: engine.intH, outW: engine.outW, outH: engine.outH, bookmarks: engine.world.bookmarks.map((b) => b.name) }),
+    info: () => ({ foliage: engine.trees ? { fallback: !!engine.trees.foliageFallback, lit: engine.trees.selfTestLit, err: engine.trees.selfTestError } : null, caps: engine.caps, intW: engine.intW, intH: engine.intH, outW: engine.outW, outH: engine.outH, bookmarks: engine.world.bookmarks.map((b) => b.name) }),
     setBookmark: (name) => { const i = engine.world.bookmarks.findIndex((b) => b.name === name); engine.setBookmark(i < 0 ? 0 : i); },
     setView: (v) => engine.setView(v),
     setTime: (i) => engine.setTime(i),

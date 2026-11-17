@@ -102,6 +102,43 @@ greener grass albedo.
 Left for later stages (needs trees/shadows): contre-jour darks near the camera, crown shadows on
 neighbours, value structure of forest views.
 
+### Stage 3, round 1
+Gaps: (1) broken colour ~3× too weak (hue ±2–3°, value σ 0.02–0.05), path one flat orange, flecks
+< 0.5 % and reading as pale pebbles; (2) pixel grain inside strokes (50–64 % of texture energy at
+1–3 px) that would crawl, stair-stepped far crown edges; (3) boulders as clay loaves with
+near-black neutral shadows; (4) mechanical patterns: random-angle "scales", curling "marbling",
+a swirl where path-edge and interior flows meet, one-direction combing; (5) distance as hard-edged
+blue-violet "worms" (far species zones), grazing strokes stretched to 4–6 % of height.
+Changes: per-stroke broken colour hue ±10°, chroma ±20 %, value ±12 %, plus a cooler darker
+underlayer between strokes; path = purple-brown earth (#6A4C3A) with lit leaf dabs on ~25 % of
+strokes; flecks on ~5 % of strokes: dark blue-green in shade, warm lit dabs (few cool notes) in
+light; stroke texture interiors flattened (bristles only at edges and tails, relief blurred
+before normals); crown edges antialiased with fwidth and crown detail faded by 1.1 km; far canopy
+beyond detail range = one averaged autumn colour with soft modulation (no species zones); flow
+field follows contours almost everywhere (threshold 0.004), slower flat-ground swirl, path strokes
+across with edges leaning only 30° (no swirl), jitter 24°; grazing foreshortening capped
+(|cos|^-0.2); boulders: flat-faceted knife planes with larger strokes, one direction per facet, warm
+reflected ground light and chroma in shadow, gold/moss flecks on tops, warmer rock albedo.
+
+### Stage 3, round 2
+Gaps: (1) grass/litter read as felt (stroke-scale contrast 0.02 vs 0.06, hue spread 5–8° vs
+25–45°, lit grass too dim); (2) strokes collapse to 2–4 px stipple beyond the foreground (ground
+strokes foreshortened vertically) and far land is sandpaper; (3) path = terrazzo chips, too
+saturated, no sun pools, soft olive edge band, a dark thread from the air; (4) boulders low-poly clay
+with near-black shadows and over-saturated marbled lit faces, no contact with the grass; (5) contour
+"agate" bands in aerial meadows.
+Changes: flat-colour strokes (winner sharpness 7), per-stroke hue ±14°, chroma ±22 %, value ±20 %, a
+darker olive underlayer between strokes, light/dark patches at 4 m and 16 m (±30 %); stroke scale
+grows with grazing incidence (|cos|^-0.3) and stroke *shapes* stretch up to 2× along the ground-
+projected view direction around world-anchored centres (shapes breathe smoothly with camera
+position, centres never slide); path = greyed mauve-umber earth with fallen leaves gathered in 4 m
+sun pools (10–55 %), ragged one-stroke edge, pale ochre ribbon from afar; boulders: smooth body with
+facets re-introduced in the shader (screen-derivative face normal mixed 45 %), lifted warm darks
+(ground bounce + sky fill), less saturation and marbling, grass over the base; stroke jitter 40° on
+flat ground; exposure key 0.17.
+Also: fixed inverted trunk winding (backlit trunks are now dark with a warm rim); foliage EQUAL-depth
+self-test at startup with automatic LESS-EQUAL + alpha-test fallback.
+
 ## Phone results
 (pasted benchmark results from the owner's S23 Ultra, and the governor changes made)
 
