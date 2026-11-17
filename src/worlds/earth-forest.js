@@ -156,12 +156,12 @@ export default {
     variants: [
       {
         name: 'maple-orange', form: 'deciduous', seed: 11, neighbour: 4,
-        height: [16, 19], baseRadius: [0.42, 0.5], forkAt: [0.25, 0.3], leanDeg: 5,
+        height: [16, 19], baseRadius: [0.42, 0.5], forkAt: [0.18, 0.22], leanDeg: 5, limbWobble: 0.5,
         limbs: [5, 6], limbStart: 0.3, limbTilt: [44, 66], limbLength: [0.4, 0.52], clusterR: [2.1, 3.0], crown: 3,
         nearCards: 250, cardSize: [1.0, 1.4], cells: [0, 1, 2, 3, 4, 5, 6, 7],
         midCards: 70, midCardSize: [2.4, 3.2], midCells: [8, 9, 10, 11, 12, 13, 14, 15],
-        palette: { lit: '#e8962a', mid: '#c0601c', interior: '#6a2e12', glow: '#f0b02a' },
-        bark: { base: '#8a6a50', dark: '#5a4a50' }, glow: 2.2,
+        palette: { lit: '#eea52a', mid: '#b8661e', interior: '#5a3c1c', glow: '#f6c23e' },
+        bark: { base: '#b08a54', dark: '#5c4a40' }, glow: 2.4,
       },
       { name: 'beech-gold', form: 'deciduous', seed: 23, palette: { lit: '#f0cc40', mid: '#d09a22', interior: '#6e4a14', glow: '#f6dc50' } },
       { name: 'red-maple', form: 'deciduous', seed: 37, palette: { lit: '#e0582a', mid: '#b0301e', interior: '#561812', glow: '#f07a2c' } },

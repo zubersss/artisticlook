@@ -59,7 +59,7 @@ void main() {
   // lit mass with a shaded underside instead of separate cotton balls.
   vec3 crownC = (M * vec4(uCrown.xyz, 1.0)).xyz;
   vec3 crownN = normalize(c.xyz - crownC + 1e-4);
-  vSN = normalize(mix(normalize(c.xyz - cc + 1e-4), crownN, 0.55));
+  vSN = normalize(mix(normalize(c.xyz - cc + 1e-4), crownN, 0.35));
   vTint = aTint;
   vCell = aCard.x;
   // Transmission through the cluster toward the Sun (per card).
@@ -191,7 +191,7 @@ export class Trees {
         flat in float vCell;
         in vec4 vGlow;
         float phaseLeaf(float mu) {
-          float a = hgPhase(mu, 0.7) / hgPhase(1.0, 0.7);
+          float a = hgPhase(mu, 0.55) / hgPhase(1.0, 0.55);
           float b = hgPhase(mu, 0.25) / hgPhase(1.0, 0.25);
           return 0.5 * a + 0.5 * b;
         }
@@ -210,20 +210,20 @@ export class Trees {
           // Sun-facing parts of the crown take the lit (gold-orange) colour.
           float sunFace = smoothstep(-0.15, 0.6, dot(vSN, uSunDir));
           alb = mix(alb, uLeafLit, saturate(sunFace * 0.75 + smoothstep(0.7, 1.0, shell) * 0.25));
-          alb = oklabJitter(alb, (id - 0.5) * radians(16.0), 0.1 * cos(6.2831 * id * 2.0), (fract(id * 3.7) - 0.5) * 0.24);
+          alb = oklabJitter(alb, (id - 0.5) * radians(20.0), 0.12 * cos(6.2831 * id * 2.0), (fract(id * 3.7) - 0.5) * 0.36);
           alb = mix(uLeafDeep, alb, mix(0.35, 1.0, ao));
           // Soft volume normal: cluster sphere, a little toward the viewer, plus dab relief.
           float dhx = dFdx(t.a), dhy = dFdy(t.a);
-          vec3 N = normalize(mix(vSN, V, 0.2) - (dhx * uCamRight + dhy * uCamUp) * 3.0);
+          vec3 N = normalize(mix(vSN, V, 0.2) - (dhx * uCamRight + dhy * uCamUp) * 0.8);
           vec3 col = painterLight(alb, N, 1.0, ao);
           // Canopy interiors stay deep and saturated (umber-red), never grey-brown.
-          if (uViewMode > 0.5) col = chromaScale(col, 1.0 + 0.45 * (1.0 - ao) + 0.15 * (1.0 - saturate(dot(N, uSunDir) + 0.3)));
+          if (uViewMode > 0.5) col = chromaScale(col, 1.0 + 0.15 * (1.0 - ao));
           // Backlit glow: strongest effect of the references. Thin edges glow most.
           float mu = dot(-V, uSunDir);
           float edge = 1.0 - t.b;
           // Glow lives on the outer shell and thin dab edges; the body stays orange.
           float shellW = smoothstep(0.6, 1.0, shell);
-          vec3 glow = luma(uSunColor) * uLeafGlow * uGlowK * phaseLeaf(mu) * vGlow.rgb * mix(0.6, 1.25, edge) * mix(0.45, 1.0, shellW);
+          vec3 glow = luma(uSunColor) * uLeafGlow * uGlowK * phaseLeaf(mu) * vGlow.rgb * mix(0.55, 1.4, edge) * mix(0.5, 1.0, shellW);
           col += glow * mix(0.5, 1.0, painterK());
           col = applyAerial(col, vRel, d);
           if (uOverdraw > 0.5) { fragColor = vec4(1.0 / 255.0); return; }
@@ -269,16 +269,22 @@ export class Trees {
           vec4 b1 = texture(tBark, buv / (1.6 * exp2(k0 + 1.0)) + 0.37);
           vec4 b = mix(b0, b1, smoothstep(0.6, 1.0, fr));
           vec3 alb = mix(uBarkDark, uBarkLit, smoothstep(0.2, 0.8, b.r));
-          alb = oklabJitter(alb, (b.a - 0.5) * radians(10.0), 0.15 * cos(6.2831 * b.a * 3.0), (b.a - 0.5) * 0.18);
+          alb = oklabJitter(alb, (b.a - 0.5) * radians(16.0), 0.2 * cos(6.2831 * b.a * 3.0), (fract(b.a * 5.3) - 0.5) * 0.5);
           // Moss at the base and on upward-facing limb tops.
-          float moss = (1.0 - smoothstep(0.3, 1.3, vBark.z)) * (0.6 + 0.4 * b.r) + smoothstep(0.55, 0.9, N.y) * 0.6 * step(0.5, vBark.w);
+          // Moss: the base and its shaded flank, limb tops and crotches.
+          float flank = saturate(0.4 - dot(N, uSunDir));
+          float moss = (1.0 - smoothstep(0.3, 1.6 + flank * 1.5, vBark.z)) * (0.6 + 0.4 * b.r) + smoothstep(0.45, 0.85, N.y) * 0.7 * step(0.5, vBark.w);
           alb = mix(alb, uMossCol, clamp(moss, 0.0, 0.85));
           vec3 bn = vec3(b.g, b.b, 0.0) * 2.0 - 1.0;
           vec3 Ns = normalize(N + 0.25 * (bn.x * normalize(cross(N, vec3(0.0, 1.0, 0.0)) + 1e-4) + bn.y * vec3(0.0, 1.0, 0.0)) * painterK());
           vec3 col = painterLight(alb, Ns, 1.0, mix(0.6, 1.0, smoothstep(0.0, 1.5, vBark.z)));
-          // Gold rim when backlit.
-          float rim = pow(1.0 - saturate(abs(dot(N, V))), 3.0) * pow(saturate(dot(-V, uSunDir)), 2.0);
-          col += uSunColor * uGlowHue * rim * 0.6 * painterK();
+          // Shade side: cool mauve reflected light and warm chroma (never neutral black).
+          col += alb * (uSkyHorizon * 0.15 + uGroundBounce * 0.8) * saturate(0.3 - dot(N, uSunDir)) * painterK();
+          if (uViewMode > 0.5) col = chromaScale(col, 1.25);
+          // Gold rim when backlit, broken into strokes on the Sun side.
+          float rim = pow(1.0 - saturate(abs(dot(N, V))), 2.5) * pow(saturate(dot(-V, uSunDir)), 2.0);
+          rim *= smoothstep(0.3, 0.6, fract(b.a * 3.7)) * saturate(dot(N, normalize(uSunDir - V * dot(uSunDir, V))) * 2.0);
+          col += uSunColor * uGlowHue * rim * 0.9 * painterK();
           col = applyAerial(col, vRel, d);
           if (uOverdraw > 0.5) { fragColor = vec4(1.0 / 255.0); return; }
           fragColor = sceneOut(col, d);

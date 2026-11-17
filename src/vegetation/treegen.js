@@ -60,6 +60,17 @@ function branchPoints(p0, dir, len, segs, upBend, rng, wobble) {
   return pts;
 }
 
+/** Thin dark twigs radiating from a cluster centre (they show through canopy gaps). */
+function addTwigs(out, c, len, r, rng) {
+  const n = 4;
+  for (let i = 0; i < n; i++) {
+    const a = rng.next() * Math.PI * 2, e = rng.range(-0.3, 0.8);
+    const d = new THREE.Vector3(Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e));
+    const pts = branchPoints(c.clone().addScaledVector(d, -0.3), d, len * rng.range(0.7, 1.2), 2, 0.2, rng, 0.6);
+    addTube(out, pts, pts.map((_, j) => Math.max(0.015, r) * (1 - 0.7 * j / (pts.length - 1))), 3, 3, 0);
+  }
+}
+
 export function generateTree(recipe, seed) {
   const rng = new Rng(seed);
   const R = recipe;
@@ -79,12 +90,12 @@ export function generateTree(recipe, seed) {
     const y = f * trunkTop;
     const s = Math.sin(f * Math.PI * 1.3) * 0.35 * H * 0.02;
     trunkPts.push(new THREE.Vector3(Math.cos(leanA) * (Math.sin(lean) * y + s), y, Math.sin(leanA) * (Math.sin(lean) * y + s)));
-    trunkR.push(baseR * (conifer ? (1 - f * 0.92) : (1 - f * 0.55)));
+    trunkR.push(baseR * (conifer ? (1 - f * 0.92) : (1 - f * 0.55) * (f > 0.85 ? 1 - (f - 0.85) / 0.15 * 0.75 : 1)));
   }
   // Root collar below ground so the flared base never floats on slopes.
   const tubePts = [new THREE.Vector3(trunkPts[0].x, -1.2, trunkPts[0].z), ...trunkPts];
   const tubeR = [trunkR[0] * 1.15, ...trunkR];
-  addTube(out, tubePts, tubeR, R.trunkSides ?? 10, 0, -1.2, { amount: 0.6, lobes: 4 + rng.int(2), phase: rng.next() * 6, rings: 2 });
+  addTube(out, tubePts, tubeR, R.trunkSides ?? 10, 0, -1.2, { amount: 0.9, lobes: 4 + rng.int(2), phase: rng.next() * 6, rings: 2 });
 
   if (conifer) {
     // Tiered cone of clusters along the trunk; short drooping whorls.
@@ -114,26 +125,37 @@ export function generateTree(recipe, seed) {
       const dir = new THREE.Vector3(Math.cos(ang) * Math.sin(tilt), Math.cos(tilt), Math.sin(ang) * Math.sin(tilt));
       const ll = R.limbLength ?? [0.32, 0.45];
       const len = H * rng.range(ll[0], ll[1]) * (1 - (f - R.limbStart) * 0.5);
-      const pts = branchPoints(p0, dir, len, 5, 0.35, rng, 0.25);
+      const pts = branchPoints(p0, dir, len, 6, 0.4, rng, R.limbWobble ?? 0.45);
       const r0 = trunkR[idx] * rng.range(0.5, 0.65);
-      addTube(out, pts, pts.map((_, i) => r0 * (1 - 0.75 * i / (pts.length - 1))), 6, 1, 0);
-      // Secondaries.
+      const limbR = pts.map((_, i) => r0 * Math.pow(1 - 0.85 * i / (pts.length - 1), 1.3));
+      addTube(out, pts, limbR, 6, 1, 0);
+      // Secondaries (2-3), each splitting once more into tertiaries.
       const nSec = 2 + rng.int(2);
       for (let s = 0; s < nSec; s++) {
         const k = 2 + rng.int(3);
         const q0 = pts[Math.min(pts.length - 1, k)];
         const sd = dir.clone().applyAxisAngle(UP, rng.range(-1.2, 1.2)).lerp(UP, 0.25).normalize();
         const sl = len * rng.range(0.35, 0.55);
-        const sp = branchPoints(q0, sd, sl, 3, 0.25, rng, 0.35);
-        const sr = r0 * (1 - 0.75 * k / (pts.length - 1)) * 0.7;
+        const sp = branchPoints(q0, sd, sl, 4, 0.25, rng, 0.5);
+        const sr = limbR[Math.min(limbR.length - 1, k)] * 0.75;
         addTube(out, sp, sp.map((_, i) => sr * (1 - 0.8 * i / (sp.length - 1))), 5, 2, 0);
-        clusters.push({ c: sp[sp.length - 1].clone(), r: rng.range(R.clusterR[0], R.clusterR[1]) * 0.85, flat: 0.85 });
+        const tc = sp[sp.length - 1].clone();
+        clusters.push({ c: tc, r: rng.range(R.clusterR[0], R.clusterR[1]) * 0.85, flat: 0.85 });
+        addTwigs(out, tc, 1.6, sr * 0.3, rng);
       }
-      clusters.push({ c: pts[pts.length - 1].clone(), r: rng.range(R.clusterR[0], R.clusterR[1]), flat: 0.85 });
+      const lc = pts[pts.length - 1].clone();
+      clusters.push({ c: lc, r: rng.range(R.clusterR[0], R.clusterR[1]), flat: 0.85 });
+      addTwigs(out, lc, 1.8, limbR[limbR.length - 1] * 0.6, rng);
     }
-    // Crown spheres to close the top.
+    // Crown spheres to close the top, each reached by a leader from the trunk top.
+    const top = trunkPts[segs];
     for (let k = 0; k < (R.crown ?? 2); k++) {
-      clusters.push({ c: trunkPts[segs].clone().add(new THREE.Vector3(rng.range(-1, 1), H * 0.18 + rng.range(-0.5, 1), rng.range(-1, 1))), r: rng.range(R.clusterR[0], R.clusterR[1]) * 1.15, flat: 0.8 });
+      const c = top.clone().add(new THREE.Vector3(rng.range(-1.2, 1.2), H * 0.18 + rng.range(-0.5, 1), rng.range(-1.2, 1.2)));
+      clusters.push({ c, r: rng.range(R.clusterR[0], R.clusterR[1]) * 1.15, flat: 0.8 });
+      const d = c.clone().sub(top);
+      const lp = branchPoints(top, d.clone().normalize(), d.length(), 4, 0.1, rng, 0.3);
+      addTube(out, lp, lp.map((_, i) => trunkR[segs] * 1.4 * (1 - 0.8 * i / (lp.length - 1))), 5, 2, 0);
+      addTwigs(out, c, 1.8, trunkR[segs] * 0.4, rng);
     }
   }
 

@@ -38,7 +38,7 @@ export function generateDabAtlas(N = 512, opt = {}) {
           const a = rng.next() * Math.PI * 2, d = Math.sqrt(rng.next()) * (0.5 - r - 0.03);
           px = 0.5 + Math.cos(a) * d; py = 0.5 + Math.sin(a) * d;
           tries++;
-        } while (tries < 30 && dabs.some((q) => Math.hypot(q.x - px, q.y - py) < (q.r + r) * (near ? 0.85 : 0.7)));
+        } while (tries < 40 && dabs.some((q) => Math.hypot(q.x - px, q.y - py) < (q.r + r) * (near ? 1.0 : 0.8)));
         dabs.push({
           x: px, y: py, r, id: rng.next(), ang: rng.next() * Math.PI,
           star: near && rng.next() < 0.3, lobes: 3 + rng.int(3),

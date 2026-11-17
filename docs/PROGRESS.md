@@ -155,6 +155,22 @@ tops); radial stroke stretch up to 2.2×; octave cross-fade widened to 0.6 so si
 Stability: 3-frame sequences at every bookmark keep strokes attached; remaining risk is fine
 detail in mid-distance grass at 30–80 m — check on the phone.
 
+### Stage 4 (hero tree), round 1
+Gaps: (1) leaf dabs read as soft felt puffs (one lobed blob per card, dark rim, flat value inside);
+(2) branches a broom of dowels: trunk continues past the fork as a capped cylinder, straight
+untapered limbs fanning from one zone, floating outer clusters; (3) backlit glow only a narrow disc
+around the Sun, too orange (h34); (4) sunlit crown red-orange two-tone, crimson shade instead of
+umber, no gold tops; (5) trunk an airbrushed tube, neutral-black backlit core, uniform thin rim,
+smooth moss band.
+Changes: dab atlas places dabs with no overlap (distinct dabs); per-dab hue ±10°, value ±18 %;
+dab relief no longer darkens edges; trunk tapers into a leader inside the crown (no cap); fork at
+18–22 % of height; limbs bend (wobble 0.5), taper with a power curve, split into secondaries, and
+every cluster gets 4 dark twigs; crown spheres connected by leaders; root flare 0.9; cluster
+normals 35 % crown-blended (each cluster its own lit/shaded ball); glow lobe g 0.55 (wider), edge
+weighted, hue #F6C23E; palette lit #EEA52A / mid #B8661E / interior umber #5A3C1C; interior chroma
+boost cut to 0.15; bark ochre #B08A54 / umber #5C4A40 with per-stroke value ±25 %, warm shade-side
+chroma, rim broken into strokes on the Sun side, moss on the shaded flank, limb tops and crotches.
+
 ## Phone results
 (pasted benchmark results from the owner's S23 Ultra, and the governor changes made)
 
