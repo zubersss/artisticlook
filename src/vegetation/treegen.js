@@ -50,8 +50,14 @@ function branchPoints(p0, dir, len, segs, upBend, rng, wobble) {
   const pts = [p0.clone()];
   const d = dir.clone().normalize();
   const p = p0.clone();
+  // 1-2 elbows: a crook of 20-35 degrees at random segments.
+  const e1 = 1 + rng.int(Math.max(1, segs - 1)), e2 = 1 + rng.int(Math.max(1, segs - 1));
   for (let i = 1; i <= segs; i++) {
     const step = len / segs;
+    if (segs >= 3 && (i === e1 || i === e2)) {
+      const axis = new THREE.Vector3(rng.next() - 0.5, 0, rng.next() - 0.5).normalize();
+      d.applyAxisAngle(axis, rng.range(0.35, 0.6) * (rng.next() < 0.5 ? -1 : 1));
+    }
     d.lerp(UP, upBend / segs).normalize();
     d.x += (rng.next() - 0.5) * wobble; d.z += (rng.next() - 0.5) * wobble; d.normalize();
     p.addScaledVector(d, step);
@@ -62,12 +68,12 @@ function branchPoints(p0, dir, len, segs, upBend, rng, wobble) {
 
 /** Thin dark twigs radiating from a cluster centre (they show through canopy gaps). */
 function addTwigs(out, c, len, r, rng) {
-  const n = 4;
+  const n = 3;
   for (let i = 0; i < n; i++) {
     const a = rng.next() * Math.PI * 2, e = rng.range(-0.3, 0.8);
     const d = new THREE.Vector3(Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e));
     const pts = branchPoints(c.clone().addScaledVector(d, -0.4), d, len * rng.range(0.5, 0.8), 3, 0.25, rng, 0.7);
-    addTube(out, pts, pts.map((_, j) => Math.max(0.035, r) * (1 - 0.6 * j / (pts.length - 1))), 3, 3, 0);
+    addTube(out, pts, pts.map((_, j) => Math.max(0.05, r) * (1 - 0.5 * j / (pts.length - 1))), 3, 3, 0);
   }
 }
 
@@ -117,7 +123,8 @@ export function generateTree(recipe, seed) {
     // Limbs from the upper trunk, each splitting into secondaries; clusters at tips.
     const nLimbs = R.limbs[0] + rng.int(R.limbs[1] - R.limbs[0] + 1);
     for (let l = 0; l < nLimbs; l++) {
-      const f = rng.range(R.limbStart, 1.0);
+      // Staggered fork heights.
+      const f = R.limbStart + (1 - R.limbStart) * Math.min(0.98, (l + rng.range(0.1, 0.8)) / nLimbs);
       const idx = Math.min(segs - 1, Math.floor(f * segs));
       const p0 = trunkPts[idx].clone().lerp(trunkPts[idx + 1], f * segs - idx);
       const ang = (l / nLimbs) * Math.PI * 2 + rng.range(-0.4, 0.4);
@@ -154,7 +161,7 @@ export function generateTree(recipe, seed) {
       clusters.push({ c, r: rng.range(R.clusterR[0], R.clusterR[1]) * 1.15, flat: 0.8 });
       const d = c.clone().sub(top);
       const lp = branchPoints(top, d.clone().normalize(), d.length(), 4, 0.1, rng, 0.3);
-      addTube(out, lp, lp.map((_, i) => trunkR[segs] * 1.4 * (1 - 0.8 * i / (lp.length - 1))), 5, 2, 0);
+      addTube(out, lp, lp.map((_, i) => trunkR[segs - 1] * 0.9 * (1 - 0.8 * i / (lp.length - 1))), 6, 2, 0);
       addTwigs(out, c, 1.8, trunkR[segs] * 0.4, rng);
     }
   }

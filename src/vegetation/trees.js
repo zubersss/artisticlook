@@ -210,11 +210,13 @@ export class Trees {
           vec3 N = normalize(mix(vSN, V, 0.2));
           vec3 col = painterLight(alb, N, 1.0, ao);
           if (uViewMode > 0.5) {
-            // Foliage shade stays warm umber (the violet fill would turn orange crimson).
+            // Foliage shade is burnt umber with its chroma kept, never crimson or black:
+            // value floored at ~22 % of the sunlit leaf.
             float L = luma(col);
+            float litL = luma(alb * uSunColor) * 0.6;
             float shadeW = 1.0 - smoothstep(0.0, 0.5, dot(N, uSunDir) + 0.2);
-            vec3 umber = uLeafDeep / max(luma(uLeafDeep), 1e-4) * L;
-            col = mix(col, umber, shadeW * 0.55);
+            vec3 umber = uLeafDeep / max(luma(uLeafDeep), 1e-4);
+            col = mix(col, umber * max(L, litL * 0.22), max(shadeW * 0.85, 1.0 - smoothstep(0.0, litL * 0.3, L)));
           }
           // Backlight. (a) The whole crown transmits warm orange light (wide lobe): the body
           // stays orange. (b) Thin fringe dabs within ~25 deg of the Sun turn gold (narrow lobe).
@@ -222,9 +224,10 @@ export class Trees {
           float shellW = smoothstep(0.6, 1.0, shell);
           float Es = luma(uSunColor) * uGlowK;
           float wide = hgPhase(mu, 0.3) / hgPhase(1.0, 0.3);
-          float narrow = smoothstep(0.88, 0.985, mu);
+          float narrow = smoothstep(0.82, 0.98, mu);
           vec3 body = alb * 1.3 * Es * 0.35 * wide * vGlow.rgb;
-          vec3 fringe = uLeafGlow * Es * 0.55 * narrow * vGlow.rgb * shellW * (0.6 + 0.4 * step(0.4, fract(id * 5.1)));
+          vec3 fringe = uLeafGlow * Es * 0.42 * narrow * vGlow.rgb * shellW * (0.5 + 0.5 * step(0.25, fract(id * 5.1)));
+          fringe = chromaScale(fringe, 1.25); // saturated gold, not chalky cream
           col += (body + fringe) * mix(0.5, 1.0, painterK());
           col = applyAerial(col, vRel, d);
           if (uOverdraw > 0.5) { fragColor = vec4(1.0 / 255.0); return; }
@@ -237,7 +240,7 @@ export class Trees {
       uniforms: {
         tBark: { value: this.bark },
         uBarkLit: { value: lin(rec.bark?.base ?? '#8a6a50') }, uBarkDark: { value: lin(rec.bark?.dark ?? '#5a4a48') },
-        uMossCol: { value: lin(W.ground.moss) }, uMossSide: { value: new THREE.Vector3(0.3, 0, -0.95).normalize() }, // north-facing flank
+        uMossCol: { value: lin(rec.bark?.moss ?? W.ground.moss) }, uMossShade: { value: lin(rec.bark?.mossShade ?? '#4b5020') }, uMossSide: { value: new THREE.Vector3(0.3, 0, -0.95).normalize() }, // north-facing flank
       },
       vertex: /* glsl */ `
         in vec4 aBark;
@@ -254,7 +257,7 @@ export class Trees {
         }`,
       fragment: /* glsl */ `
         uniform sampler2D tBark;
-        uniform vec3 uBarkLit, uBarkDark, uMossCol, uMossSide;
+        uniform vec3 uBarkLit, uBarkDark, uMossCol, uMossShade, uMossSide;
         in vec3 vRel;
         in vec3 vN;
         in vec4 vBark;
@@ -266,28 +269,33 @@ export class Trees {
           float s = log2(max(d * 0.06, 1.0));
           float k0 = floor(s); float fr = s - k0;
           vec2 buv = vec2(vBark.y, vBark.x); // texture U along the trunk -> vertical strokes
-          vec4 b0 = texture(tBark, buv / (2.4 * exp2(k0)) * vec2(1.0, 2.5));
-          vec4 b1 = texture(tBark, buv / (2.4 * exp2(k0 + 1.0)) * vec2(1.0, 2.5) + 0.37);
+          vec4 b0 = texture(tBark, buv / (2.4 * exp2(k0)) * vec2(1.0, 2.5), 0.8);
+          vec4 b1 = texture(tBark, buv / (2.4 * exp2(k0 + 1.0)) * vec2(1.0, 2.5) + 0.37, 0.8);
           vec4 b = mix(b0, b1, smoothstep(0.6, 1.0, fr));
-          vec3 alb = mix(uBarkDark, uBarkLit, smoothstep(0.2, 0.8, b.r));
-          alb = oklabJitter(alb, (b.a - 0.5) * radians(16.0), 0.2 * cos(6.2831 * b.a * 3.0), (fract(b.a * 5.3) - 0.5) * 0.5);
+          // Ochre where the Sun reaches, mauve on the shade side (a painter's bark).
+          float sunSide = smoothstep(-0.25, 0.35, dot(N, uSunDir));
+          vec3 alb = mix(uBarkDark, uBarkLit, sunSide);
+          alb *= 0.85 + 0.3 * smoothstep(0.2, 0.8, b.r);
+          alb = oklabJitter(alb, (b.a - 0.5) * radians(16.0), 0.15 * cos(6.2831 * b.a * 3.0), (fract(b.a * 5.3) - 0.5) * 0.4);
           // Moss at the base and on upward-facing limb tops.
           // Moss: the base and its shaded flank, limb tops and crotches.
           float flank = smoothstep(-0.2, 0.6, dot(N, uMossSide));
           float patchM = smoothstep(0.35, 0.65, vnoise(vBark.xy * vec2(2.0, 1.2) + 11.0));
-          float moss = (1.0 - smoothstep(0.2, 0.6 + flank * 1.6, vBark.z)) * flank * patchM * 1.3
+          float moss = (1.0 - smoothstep(0.3, 0.7 + flank * 1.0, vBark.z)) * flank * (0.4 + 0.6 * patchM) * 1.5
                      + smoothstep(0.45, 0.85, N.y) * 0.7 * step(0.5, vBark.w) * patchM;
-          alb = mix(alb, uMossCol, clamp(moss, 0.0, 0.85));
+          alb = mix(alb, mix(uMossShade, uMossCol, sunSide), clamp(moss, 0.0, 0.9));
           vec3 bn = vec3(b.g, b.b, 0.0) * 2.0 - 1.0;
           vec3 Ns = normalize(N + 0.25 * (bn.x * normalize(cross(N, vec3(0.0, 1.0, 0.0)) + 1e-4) + bn.y * vec3(0.0, 1.0, 0.0)) * painterK());
           vec3 col = painterLight(alb, Ns, 1.0, mix(0.6, 1.0, smoothstep(0.0, 1.5, vBark.z)));
           // Shade side: cool mauve reflected light and warm chroma (never neutral black).
-          col += alb * (uSkyHorizon * 0.04 + uGroundBounce * 0.2) * saturate(0.3 - dot(N, uSunDir)) * painterK();
-          if (uViewMode > 0.5) col = chromaScale(col, 1.25);
+          // Warm light bounced from the sunlit ground keeps backlit trunks umber, not black.
+          float shadeSide = saturate(0.3 - dot(N, uSunDir));
+          col += alb * (uSkyHorizon * 0.08 + uGroundBounce * 0.55) * shadeSide * painterK();
+          if (uViewMode > 0.5) col = chromaScale(col, 1.0 + 0.35 * shadeSide);
           // Gold rim when backlit, broken into strokes on the Sun side.
           float rim = pow(1.0 - saturate(abs(dot(N, V))), 4.0) * pow(saturate(dot(-V, uSunDir)), 2.0) * (vBark.w < 0.5 ? 1.0 : 0.15);
           rim *= smoothstep(0.3, 0.6, fract(b.a * 3.7)) * saturate(dot(N, normalize(uSunDir - V * dot(uSunDir, V))) * 2.0);
-          col += uSunColor * uGlowHue * rim * 0.9 * painterK();
+          col += uSunColor * vec3(1.0, 0.72, 0.2) * rim * 1.1 * painterK();
           col = applyAerial(col, vRel, d);
           if (uOverdraw > 0.5) { fragColor = vec4(1.0 / 255.0); return; }
           fragColor = sceneOut(col, d);

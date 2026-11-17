@@ -10,7 +10,7 @@ judging the look only; performance numbers come only from the owner's phone.
 | 1 | Skeleton: renderer, camera-relative world, HDR target + bloom/shafts/exposure + final pass, governor, HUD, touch/desktop input, bookmarks, basic benchmark, Pages workflow, screenshot/stability/overdraw script | builds; runs headless with no console errors; screenshot script saves every bookmark; workflow present | **done** — placeholder ground/sky through the full HDR chain; tap-to-start, touch look/stick, HUD, benchmark start/stop/report verified headless |
 | 2 | Terrain (clipmap, recipe heightfield, path/stream/clearings carving), far hills & ridges, CPU atmosphere LUT sky, aerial perspective + height fog, painter's light | screenshots of all bookmarks; critic rounds (≤ 3) | **done** — 3 critic rounds (log below); CDLOD terrain, CPU atmosphere LUT, painted sky, aerial + ground haze, painter's light, far canopy crowns |
 | 3 | Brushwork on ground and rocks: stroke texture, hex-tiled world-space strokes, 2 octaves, broken colour, flecks, sheen, brushed shadow edges; boulders | critic rounds; stability test | **done** — 3 critic rounds, stability sheets at every bookmark |
-| 4 | One hero tree: trunk/limbs/bark strokes, leaf-dab atlas (coverage-preserving mips), canopy clusters, backlit glow; tuned against references | critic rounds; stability; **phone checkpoint 1** | |
+| 4 | One hero tree: trunk/limbs/bark strokes, leaf-dab atlas (coverage-preserving mips), canopy clusters, backlit glow; tuned against references | critic rounds; stability; **phone checkpoint 1** | **done** — 3 critic rounds; stability OK; waiting for phone checkpoint 1 |
 | 5 | Forest: density map placement (1,500–2,500), 6 deciduous + 2 conifer variants, instancing per variant per LOD, near/mid LOD fades, far painted canopy on terrain | critic; stability; overdraw < 2.5 | |
 | 6 | Shadows: two cascades (120 m / 900 m), staggered updates, soft + brushed filtering, dappled light | critic; stability; **phone checkpoint 2** | |
 | 7 | Ground dressing (tufts, flowers), stream, clouds, Moon, lander (parallel agents allowed for independent modules) | critic; stability | |
@@ -188,6 +188,20 @@ light only at true silhouettes (limbs 15 %); the trunk shade fill that made the 
 quarter; bloom gets an exposure-aware soft threshold (knee 0.7 exposed) and is additive, so dark
 forms in front of the Sun stay dark.
 
+### Stage 4 (hero tree), round 3 (final)
+Gaps: (1) crown shade crimson going black (39 % of leaf pixels h<15°); (2) trunk in front of the Sun a
+grey pole (veil); (3) backlit glow chalky/peach, gold only 0.3–2.5 % of leaves; (4) limbs a
+candelabra from one node, cone-tipped leader, 1-px hairline twigs; (5) bark orange like the leaves,
+hard dark outline on the shade side, no moss.
+Changes: foliage shade mixed 85 % to burnt umber with value floored at 22 % of the sunlit leaf;
+light shafts moved to the bloom texture's alpha and scaled in the final pass by the length of lit air
+in front of each pixel (dist/250 m) — near occluders in front of the Sun stay dark; post shadow-cool
+grade 0.2 → 0.1; gold fringe lobe widened (μ 0.82–0.98), on 75 % of outer dabs, chroma ×1.25;
+staggered limb fork heights, 1–2 elbows (20–35°) per branch, leaders continue from the trunk top,
+twigs ≥ 5 cm and fewer; bark lit/shade by lighting (ochre ↔ mauve albedo, desaturated so warm light
+doesn't make it orange), +0.8 mip bias on bark, warm ground bounce on the shade side; moss lit/shade
+pair on the north flank up to ~1.2 m and in crotches; gold rim colour.
+
 ## Phone results
 (pasted benchmark results from the owner's S23 Ultra, and the governor changes made)
 
@@ -198,6 +212,7 @@ counts the foliage depth prepass)
 | Stage | path | clearing | backlit | hill | aerial |
 |---|---|---|---|---|---|
 | 3 (ground + 3 hero trees) | 1.09 / 1.10 | 1.03 / 1.05 | 1.10 / 1.23 | 1.18 / 1.18 | 1.00 / 1.00 |
+| 4 (hero tree final) | 1.10 / 1.10 | 1.03 / 1.05 | 1.09 / 1.18 | 1.18 / 1.18 | 1.00 / 1.00 |
 
 ## Tools
 - `node scripts/pose-shot.mjs --pose="x,z,eye,yaw,pitch;..." --out="a.jpg;..."` screenshots from

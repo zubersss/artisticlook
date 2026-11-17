@@ -127,6 +127,7 @@ void main() {
   bloom *= max(yb, 0.0) / max(xb, 1e-5);
   bloom *= mix(vec3(1.0), uBloomTint, uMix.z);
   vec3 outc = bloom * uMix.x;
+  float shaft = 0.0;
   if (uMix.y > 0.0) {
     vec2 delta = (uSunUv - vUv) * (0.85 / float(SHAFT_TAPS));
     float j = hash2i(ivec2(gl_FragCoord.xy));
@@ -136,9 +137,11 @@ void main() {
       acc += texture(tQuarter, clamp(p, vec2(0.0), vec2(1.0)) * uQuarter.xy).a * w;
       wsum += w; w *= 0.94; p += delta;
     }
-    outc += uShaftColor * (acc / wsum) * uMix.y;
+    shaft = (acc / wsum) * uMix.y;
   }
-  fragColor = vec4(outc, 1.0);
+  // Shafts go in alpha: the final pass scales them by the length of lit air in front
+  // of each pixel, so near trunks and limbs in front of the Sun stay dark silhouettes.
+  fragColor = vec4(outc, shaft);
 }`;
 
 // --- Auto-exposure: clamped log-average of the 1/16 image, slow adaptation.
@@ -208,6 +211,7 @@ uniform vec3 uCamFwd;
 uniform vec2 uTanHalf;
 uniform vec2 uOutRes;
 uniform float uCanvasScale;
+uniform vec3 uShaftColor;
 
 // Lottes 2016 curve on the max channel, ratio-preserving with controlled desaturation.
 vec3 lottes(vec3 c) {
@@ -262,8 +266,9 @@ void main() {
   c = clamp(c + (c * 4.0 - (n1 + n2 + n3 + n4)) * (uBloom.z * 0.25), mn, mx);
 
   // Bloom and shafts arrive pre-scaled in one quarter-res texture.
-  vec3 bs = texture(tBloom, uv * uBloomSrc.xy).rgb;
-  c += bs; // thresholded glow is purely additive
+  vec4 bs = texture(tBloom, uv * uBloomSrc.xy);
+  float airLen = saturate(sceneDistAt(suv, c0) / 250.0);
+  c += bs.rgb + uShaftColor * bs.a * airLen; // thresholded glow is purely additive
 
   c *= vExpo;
 
@@ -359,7 +364,7 @@ export class Post {
       ...sceneU(), tBloom: { value: null }, tExposure: { value: null }, tCanvas: { value: null },
       uSrc: v4(), uBloomSrc: v4(), uBloom: v4(), uGrade: v4(), uGrade2: v4(), uCurve: v4(),
       uLiftColor: v3(), uWarmTint: v3(1, 1, 1), uCamRight: v3(), uCamUp: v3(), uCamFwd: v3(),
-      uTanHalf: v2(), uOutRes: v2(), uCanvasScale: { value: 1 },
+      uTanHalf: v2(), uOutRes: v2(), uCanvasScale: { value: 1 }, uShaftColor: v3(1, 0.8, 0.5),
     }, defs, FINAL_VERT);
     this.mOverdraw = fsMaterial('post.overdraw', OVERDRAW_VIEW, { tCount: { value: null } });
     this.materials = [this.mPrefilter, this.mDown, this.mUp, this.mUpShafts, this.mExposure, this.mFinal];
@@ -510,7 +515,6 @@ export class Post {
     us.tSrc.value = this.b8.texture; this._src(us.uSrc, this.b8);
     us.tQuarter.value = this.b4.texture; this._src(us.uQuarter, this.b4);
     us.uSunUv.value.copy(sunUv);
-    us.uShaftColor.value.set(p.shaftColor[0], p.shaftColor[1], p.shaftColor[2]);
     us.uBloomTint.value.set(p.bloomTint[0], p.bloomTint[1], p.bloomTint[2]);
     us.uMix.value.set(f.viewMode > 0.5 ? p.bloomStrength : p.bloomStrength * 0.5, shaftOn ? p.shaftStrength * sunVisible : 0, f.viewMode > 0.5 ? 1 : 0, p.bloomKnee ?? 0.6);
     us.tExpoNow.value = next.texture;
@@ -535,6 +539,7 @@ export class Post {
     fu.uTanHalf.value.set(th * cam.aspect, th);
     fu.uOutRes.value.set(f.outW, f.outH);
     fu.uCanvasScale.value = 1080 / Math.max(1, f.outH);
+    fu.uShaftColor.value.set(p.shaftColor[0], p.shaftColor[1], p.shaftColor[2]);
     r.setRenderTarget(null);
     r.setViewport(0, 0, f.outW, f.outH);
     this.quad.material = this.mFinal;

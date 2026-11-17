@@ -73,7 +73,7 @@ export default {
     bloomStrength: 0.09, bloomKnee: 0.7, bloomTint: [1.0, 0.9, 0.75], shaftStrength: 0.5, shaftColor: [1.0, 0.8, 0.5],
     sharpen: 0.35, warpPx: 2.5,
     saturation: 1.1, blackLift: 0.012, liftColor: [1.0, 0.92, 0.82], vignette: 0.26, canvas: 0.045,
-    shadowCool: 0.2, highlightWarm: 0.08, warmTint: [1.06, 1.0, 0.9], contrast: 1.1,
+    shadowCool: 0.1, highlightWarm: 0.08, warmTint: [1.06, 1.0, 0.9], contrast: 1.1,
   },
 
   // --- Terrain recipe ---
@@ -161,7 +161,7 @@ export default {
         nearCards: 250, cardSize: [0.95, 1.3], cells: [0, 1, 2, 3, 4, 5, 6, 7],
         midCards: 70, midCardSize: [2.4, 3.2], midCells: [8, 9, 10, 11, 12, 13, 14, 15],
         palette: { lit: '#e09a2a', mid: '#b8661e', interior: '#5a3c1c', glow: '#e4a419' },
-        bark: { base: '#a8774a', dark: '#6d5a5e' }, glow: 2.2,
+        bark: { base: '#9c8266', dark: '#705a54', moss: '#c0a830', mossShade: '#4b5020' }, glow: 2.2,
       },
       { name: 'beech-gold', form: 'deciduous', seed: 23, palette: { lit: '#f0cc40', mid: '#d09a22', interior: '#6e4a14', glow: '#f6dc50' } },
       { name: 'red-maple', form: 'deciduous', seed: 37, palette: { lit: '#e0582a', mid: '#b0301e', interior: '#561812', glow: '#f07a2c' } },
