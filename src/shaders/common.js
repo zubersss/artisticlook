@@ -38,6 +38,10 @@ export const G = {
   // Brushwork: x tile factor (tile ~= x * distance), y stroke texture size, z weight sharpness, w octave fade width.
   uBrush: { value: new THREE.Vector4(0.21, 512, 6, 0.35) },
   uBrushCam: { value: new THREE.Vector4() }, // fine (xy) and 128 m-coarse (zw) camera offsets
+  // Sun shadow cascades (src/shadows/shadows.js); disabled (uShadowP.z = 0) until created.
+  uShadow0: { value: null }, uShadow1: { value: null },
+  uShadowM0: { value: new THREE.Matrix4() }, uShadowM1: { value: new THREE.Matrix4() },
+  uShadowP: { value: new THREE.Vector4(0.12, 0.9, 0, 1.2) }, uShadowT: { value: new THREE.Vector4() },
 };
 
 export const GLOBAL_DEFINES = {};

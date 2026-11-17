@@ -130,6 +130,10 @@ export class Terrain {
       uWet: { value: lin(Gd.wet || '#3a3326') },
       uCanopyPal: { value: paletteTexture(W.ground.farForest, W.ground.farForestWeights) },
       uCanopyGap: { value: lin(Gd.canopyGap || '#4a2814') },
+      uCanopyFade: { value: new THREE.Vector2(...(W.vegetation?.canopyFade ?? [150, 260])) },
+      uCanopyLift: { value: W.vegetation?.canopyLift ?? 0 },
+      uTreeExtent: { value: W.vegetation?.forest?.extent ?? 1e6 },
+      uMNearV: { value: this.tex.mNear }, uMFarV: { value: this.tex.mFar },
       uGroundMix: { value: new THREE.Vector4(Gd.meadowGrass ?? 1, Gd.rockSlope ?? 0.55, Gd.canopyFar ?? 1, 0) },
     };
     this.mat = this.makeTerrainMaterial(16);
@@ -167,6 +171,11 @@ export class Terrain {
       vertex: /* glsl */ `
         in vec4 aChunk; // x, z, size, level
         uniform vec2 uMorph[${LEVELS}];
+        uniform vec2 uCanopyFade;
+        uniform float uCanopyLift;
+        uniform float uTreeExtent;
+        uniform sampler2D uMNearV;
+        uniform sampler2D uMFarV;
         uniform vec3 uCamLocal;
         uniform float uCells;
         out vec3 vRel;
@@ -182,6 +191,16 @@ export class Terrain {
           grid -= fract(grid * 0.5) * 2.0 * k;
           xz = aChunk.xy + grid * sp;
           float h = terrainHeight(xz);
+          // Beyond the 3D trees the forest is painted on the ground, raised to crown height so
+          // distant silhouettes keep the forest's volume.
+          float lift = max(smoothstep(uCanopyFade.x, uCanopyFade.y, dist), smoothstep(uTreeExtent, uTreeExtent + 15.0, max(abs(xz.x), abs(xz.y)))) * uCanopyLift;
+          if (lift > 0.0) {
+            float fw = nearWeight(xz);
+            vec2 uvF = ((xz - uFar.xy) / uFar.z + 0.5) / uFar.w;
+            vec2 uvN = ((xz - uNear.xy) / uNear.z + 0.5) / uNear.w;
+            float fd = mix(textureLod(uMFarV, uvF, 0.0).b, textureLod(uMNearV, uvN, 0.0).b, fw);
+            h += lift * smoothstep(0.2, 0.55, fd);
+          }
           vLocal = vec3(xz.x, h, xz.y);
           vec4 wp = modelMatrix * vec4(vLocal, 1.0);
           vRel = wp.xyz;
@@ -196,9 +215,56 @@ export class Terrain {
         uniform vec3 uGrassSun, uGrassShade, uGrassDry, uLitter, uLitterDark, uPathCol, uPathFleck, uPathDark, uMoss, uRock, uFields, uRidge, uWet, uCanopyGap, uCanopyAvg, uGrassAccent;
         uniform sampler2D uCanopyPal;
         uniform vec4 uGroundMix;
+        uniform vec2 uCanopyFade;
+        uniform float uTreeExtent;
         in vec3 vRel;
         in vec3 vLocal;
 
+
+        // One lattice of painted crowns (cell size in metres): lobed, domed crowns in stands,
+        // dark-saturated shade side, gold fringe toward the Sun, warm gaps between.
+        void paintedCrowns(vec2 p, float cs, float forest, float clump, vec3 N, vec3 groundAlb,
+                           inout vec3 outCol, inout vec3 outN, inout float outAO) {
+          vec2 g = p / cs;
+          vec2 cell = floor(g);
+          vec2 o = step(0.5, g - cell) - 1.0;
+          float best = 1e9; vec2 bc = vec2(0.0); uint bh = 0u; float br = 1.0;
+          for (int j = 0; j < 2; j++) for (int i = 0; i < 2; i++) {
+            vec2 cc = cell + o + vec2(float(i), float(j));
+            uint h = hashU2(uvec2(ivec2(cc) + 1048576 + int(cs)));
+            vec2 jit = vec2(float(h & 255u), float((h >> 8) & 255u)) * (1.0 / 255.0);
+            vec2 ctr = (cc + 0.2 + 0.6 * jit) * cs;
+            float r = cs * (0.38 + 0.5 * float((h >> 16) & 255u) / 255.0);
+            vec2 dv = p - ctr;
+            float lob = 1.0 + 0.16 * cos(atan(dv.y, dv.x) * 5.0 + float(h & 63u));
+            float dd = length(dv) / (r * lob);
+            if (dd < best) { best = dd; bc = ctr; bh = h; br = r * lob; }
+          }
+          // Species in stands (30-80 m) from a smooth field; greens as separate stands.
+          float pick = fract(clump * 1.7 + (hashF(bh) - 0.5) * 0.08);
+          vec3 crown = texelFetch(uCanopyPal, ivec2(int(pick * 0.78 * 63.99), 0), 0).rgb;
+          vec2 cc2 = bc * (1.0 / 48.0);
+          float greenA = vnoise(cc2 + 77.0) * 0.8 + hashF(bh ^ 0x1234567u) * 0.2;
+          float greenB = vnoise(cc2 * 1.3 + 151.0) * 0.8 + hashF(bh ^ 0x7654321u) * 0.2;
+          if (greenA > 0.64) crown = texelFetch(uCanopyPal, ivec2(63, 0), 0).rgb;
+          else if (greenB > 0.68) crown = texelFetch(uCanopyPal, ivec2(54, 0), 0).rgb;
+          crown *= 0.88 + 0.24 * hashF(bh ^ 0x68e31da4u);
+          vec2 q = (p - bc) / br;
+          // Meadow strips between stands; single crowns can stand in the meadow.
+          float exists = step(hashF(bh ^ 0x2545f491u), smoothstep(0.3, 0.8, forest + (vnoise(bc * 0.02 + 5.0) - 0.5) * 0.7));
+          float aw = max(0.2, fwidth(best) * 1.5);
+          float inside = (1.0 - smoothstep(1.0 - aw, 1.0, best)) * exists;
+          float z = sqrt(max(0.0, 1.0 - dot(q, q)));
+          vec3 Ns = normalize(N * 0.6 + vec3(q.x, z, q.y));
+          float lit = smoothstep(-0.2, 0.9, dot(Ns, uSunDir) + 0.3);
+          crown = mix(chromaScale(crown * vec3(0.6, 0.5, 0.42), 1.15), crown, lit);
+          float sunward = saturate(dot(normalize(q + 1e-4), normalize(uSunDir.xz + 1e-4)));
+          crown = mix(crown, uGlowHue * luma(crown) * 1.8, sunward * smoothstep(0.45, 0.95, best) * 0.6);
+          vec3 gapCol = mix(groundAlb, uCanopyGap, smoothstep(0.35, 0.75, forest) * exists);
+          outCol = mix(gapCol, crown, inside);
+          outN = normalize(mix(N, Ns, inside));
+          outAO = mix(0.7, mix(0.8, 1.0, z), inside);
+        }
         vec2 gridUv(vec4 g, vec2 xz) { return ((xz - g.xy) / g.z + 0.5) / g.w; }
         vec3 decodeN(vec4 t) { vec2 xz = t.rg * 2.0 - 1.0; return normalize(vec3(xz.x, max(0.05, 1.0 - dot(xz, xz)), xz.y)); }
 
@@ -245,59 +311,30 @@ export class Terrain {
           // Forest seen from beyond ~200 m becomes a painted canopy (trees are drawn
           // nearer than that): individual lit crowns on a jittered 8 m lattice, species
           // in clumps, deep umber gaps; detail fades to the averaged colour far away.
-          float canopyW = smoothstep(150.0, 260.0, dist) * smoothstep(0.2, 0.55, forest) * uGroundMix.z;
+          // Painted canopy beyond the 3D trees' range from the camera, and outside the area that
+          // has 3D trees at all.
+          float outside = smoothstep(uTreeExtent, uTreeExtent + 15.0, max(abs(xz.x), abs(xz.y)));
+          float canopyW = max(smoothstep(uCanopyFade.x, uCanopyFade.y, dist), outside) * smoothstep(0.2, 0.55, forest) * uGroundMix.z;
           float cAO = 1.0;
           if (canopyW > 0.0) {
             vec3 Nc = N;
             float clump = vnoise(wp.xz * (1.0 / 32.0)) * 0.55 + vnoise(wp.xz * (1.0 / 128.0) + 7.0) * 0.9;
-            float detail = 1.0 - smoothstep(400.0, 1100.0, dist);
             // Far away: one averaged autumn colour, gently modulated (no hard species zones).
             vec3 can = oklabJitter(uCanopyAvg, (clump - 0.7) * radians(18.0), 0.0, (vnoise(wp.xz * (1.0 / 64.0) + 3.0) - 0.5) * 0.16);
             float crownAO = 0.62;
-            if (detail > 0.0) {
-              vec2 p = wp.xz;
-              vec2 g = p * 0.125;
-              vec2 cell = floor(g);
-              vec2 o = step(0.5, g - cell) - 1.0;
-              float best = 1e9; vec2 bc = vec2(0.0); uint bh = 0u; float br = 1.0;
-              for (int j = 0; j < 2; j++) for (int i = 0; i < 2; i++) {
-                vec2 cc = cell + o + vec2(float(i), float(j));
-                uint h = hashU2(uvec2(ivec2(cc) + 1048576));
-                vec2 jit = vec2(float(h & 255u), float((h >> 8) & 255u)) * (1.0 / 255.0);
-                vec2 ctr = (cc + 0.2 + 0.6 * jit) * 8.0;
-                float r = 8.0 * (0.4 + 0.42 * float((h >> 16) & 255u) / 255.0);
-                // Lobed crown outline (a few broad lobes per crown).
-                vec2 dv = p - ctr;
-                float lob = 1.0 + 0.16 * cos(atan(dv.y, dv.x) * 5.0 + float(h & 63u));
-                float dd = length(dv) / (r * lob);
-                if (dd < best) { best = dd; bc = ctr; bh = h; br = r * lob; }
-              }
-              // Deciduous species from a smooth clump field (first 5 palette entries);
-              // the two greens arrive as separate clumps, never as thin bands.
-              float pick = fract(clump * 1.7 + (hashF(bh) - 0.5) * 0.14);
-              vec3 crown = texelFetch(uCanopyPal, ivec2(int(pick * 0.78 * 63.99), 0), 0).rgb;
-              vec2 cc2 = bc * (1.0 / 32.0);
-              float greenA = vnoise(cc2 + 77.0) * 0.7 + hashF(bh ^ 0x1234567u) * 0.3;
-              float greenB = vnoise(cc2 * 1.3 + 151.0) * 0.7 + hashF(bh ^ 0x7654321u) * 0.3;
-              if (greenA > 0.66) crown = texelFetch(uCanopyPal, ivec2(63, 0), 0).rgb;
-              else if (greenB > 0.68) crown = texelFetch(uCanopyPal, ivec2(54, 0), 0).rgb;
-              crown *= 0.9 + 0.2 * hashF(bh ^ 0x68e31da4u);
-              vec2 q = (p - bc) / br;
-              // Groves: a crown exists only where the local density allows it.
-              float exists = step(hashF(bh ^ 0x2545f491u), smoothstep(0.25, 0.8, forest + (vnoise(bc * 0.03125 + 5.0) - 0.5) * 0.6));
-              float aw = max(0.18, fwidth(best) * 1.5);
-              float inside = (1.0 - smoothstep(1.0 - aw, 1.0, best)) * exists;
-              float z = sqrt(max(0.0, 1.0 - dot(q, q)));
-              vec3 Ns = normalize(N * 0.7 + vec3(q.x, z, q.y));
-              Nc = normalize(mix(N, Ns, inside * detail));
-              // Saturated dark interior toward the shaded side, gold fringe toward the Sun.
-              float sunward = saturate(dot(normalize(vec2(q.x, q.y) + 1e-4), normalize(uSunDir.xz + 1e-4)));
-              crown = mix(crown * vec3(0.62, 0.5, 0.42), crown, smoothstep(-0.2, 0.9, dot(Ns, uSunDir) + 0.3));
-              crown = mix(crown, uGlowHue * luma(crown) * 1.9, sunward * smoothstep(0.45, 0.95, best) * 0.75);
-              vec3 gapCol = mix(alb, uCanopyGap, smoothstep(0.35, 0.75, forest) * exists);
-              vec3 crownCol = mix(gapCol, chromaScale(crown, 1.05), inside);
-              can = mix(can, crownCol, detail);
-              crownAO = mix(crownAO, mix(0.55, mix(0.78, 1.0, z), inside), detail);
+            // Two lattices of painted crowns: single trees (8 m) near, stands of crowns
+            // (22 m) farther away, so crowns stay ~1-2 % of the screen at any distance.
+            float wNear = 1.0 - smoothstep(450.0, 850.0, dist);
+            float wFar = smoothstep(450.0, 850.0, dist) * (1.0 - smoothstep(3000.0, 5500.0, dist));
+            vec3 cA = can, cB = can; vec3 nA = N, nB = N; float aoA = crownAO, aoB = crownAO;
+            if (wNear > 0.0) paintedCrowns(wp.xz, 8.0, forest, clump, N, alb, cA, nA, aoA);
+            if (wFar > 0.0) paintedCrowns(wp.xz, 22.0, forest, clump, N, alb, cB, nB, aoB);
+            float wSum = wNear + wFar;
+            if (wSum > 0.0) {
+              vec3 cc = (cA * wNear + cB * wFar) / wSum;
+              can = mix(can, cc, min(1.0, wSum));
+              Nc = normalize(mix(N, normalize(nA * wNear + nB * wFar + 1e-4), min(1.0, wSum)));
+              crownAO = mix(crownAO, (aoA * wNear + aoB * wFar) / wSum, min(1.0, wSum));
             } else {
               can = mix(can, uCanopyGap, 0.22);
             }

@@ -9,6 +9,47 @@ uniform float uCamAGL;      // camera height above ground
 
 float painterK() { return uViewMode > 0.5 ? 1.0 : 0.0; }
 
+// ---- Sun shadows (src/shadows/shadows.js renders the cascades)
+uniform highp sampler2DShadow uShadow0;
+uniform highp sampler2DShadow uShadow1;
+uniform mat4 uShadowM0;   // camera-relative position -> cascade 0 clip space
+uniform mat4 uShadowM1;
+uniform vec4 uShadowP;    // x near texel (m), y far texel (m), z enabled, w softness (texels)
+uniform vec4 uShadowT;    // xy near texel uv size, zw far texel uv size
+
+float shadowTap0(vec3 p) { return texture(uShadow0, p); }
+// Sun visibility 0..1 for a camera-relative position. nrm: geometric normal (for the
+// normal-offset bias); edge: -0.5..0.5 brush offset (stroke height - 0.5) so shadow
+// edges look brushed.
+float sunShadow(vec3 rel, vec3 nrm, float edge) {
+  if (uShadowP.z < 0.5) return 1.0;
+  float ndl = dot(nrm, uSunDir);
+  vec3 pb = rel + nrm * (uShadowP.x * 1.5) + uSunDir * (uShadowP.x * (1.0 + 2.0 * (1.0 - abs(ndl))));
+  vec4 c0 = uShadowM0 * vec4(pb, 1.0);
+  vec3 s0 = c0.xyz * 0.5 + 0.5;
+  float r = 1.0;
+  vec3 e0 = abs(c0.xyz);
+  float in0 = 1.0 - smoothstep(0.86, 0.97, max(e0.x, e0.y));
+  float sh0 = 1.0, sh1 = 1.0;
+  if (in0 > 0.0 && e0.z < 1.0) {
+    vec2 o = uShadowT.xy * uShadowP.w;
+    sh0 = 0.25 * (texture(uShadow0, vec3(s0.xy + vec2(-o.x, -o.y * 0.6), s0.z)) + texture(uShadow0, vec3(s0.xy + vec2(o.x, -o.y * 0.6), s0.z))
+                + texture(uShadow0, vec3(s0.xy + vec2(-o.x * 0.6, o.y), s0.z)) + texture(uShadow0, vec3(s0.xy + vec2(o.x * 0.6, o.y), s0.z)));
+  }
+  if (in0 < 1.0) {
+    vec3 pf = rel + nrm * (uShadowP.y * 1.5) + uSunDir * (uShadowP.y * 2.0);
+    vec4 c1 = uShadowM1 * vec4(pf, 1.0);
+    vec3 s1 = c1.xyz * 0.5 + 0.5;
+    vec3 e1 = abs(c1.xyz);
+    if (max(e1.x, e1.y) < 1.0 && e1.z < 1.0) sh1 = texture(uShadow1, s1);
+    sh1 = mix(sh1, 1.0, smoothstep(0.85, 1.0, max(e1.x, e1.y)));
+  }
+  float sh = mix(sh1, sh0, in0);
+  // Brushed edge: the stroke's paint height pushes the shadow boundary in or out.
+  return smoothstep(0.2, 0.8, sh + edge * 0.6);
+}
+
+
 // ---- Oklab (Ottosson) for chroma operations
 vec3 toOklab(vec3 c) {
   c = max(c, vec3(0.0));

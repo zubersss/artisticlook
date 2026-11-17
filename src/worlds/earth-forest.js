@@ -2,6 +2,21 @@
 // DATA ONLY: numbers, hues and recipe names. The engine has no Earth-specific code.
 // Units: metres, degrees, linear-light multipliers; hues are sRGB hex strings.
 
+// Shared tree recipes (spread into the variants below).
+const DECIDUOUS = {
+  form: 'deciduous', height: [16, 19], baseRadius: [0.42, 0.5], forkAt: [0.3, 0.38], leanDeg: 5, limbWobble: 0.5,
+  limbs: [4, 6], limbStart: 0.42, limbTilt: [45, 70], limbLength: [0.42, 0.56], clusterR: [2.4, 3.4], crown: 3,
+  nearCards: 250, cardSize: [1.05, 1.45], cells: [0, 1, 2, 3, 4, 5, 6, 7],
+  midCards: 70, midCardSize: [2.4, 3.2], midCells: [8, 9, 10, 11, 12, 13, 14, 15],
+  bark: { base: '#9c8266', dark: '#705a54', moss: '#c0a830', mossShade: '#4b5020' }, glow: 2.2,
+};
+const CONIFER = {
+  form: 'conifer', height: [18, 24], baseRadius: [0.3, 0.38], forkAt: [0.9, 0.95], leanDeg: 2, tiers: 14, crownRadius: 3.8,
+  nearCards: 250, cardSize: [1.1, 1.5], cells: [0, 1, 2, 3, 4, 5, 6, 7],
+  midCards: 90, midCardSize: [1.5, 2.0], midCells: [8, 9, 10, 11, 12, 13, 14, 15],
+  bark: { base: '#8a6448', dark: '#4e4044', moss: '#8a9030', mossShade: '#3e4a1e' }, glow: 0.12,
+};
+
 export default {
   name: 'earth-forest',
   label: 'Earth · autumn forest',
@@ -54,11 +69,11 @@ export default {
   },
 
   fog: {
-    aerialExtinction: 1e-4, // per metre at the datum (hazy autumn afternoon)
+    aerialExtinction: 1.4e-4, // per metre at the datum (hazy autumn afternoon)
     aerialScaleHeight: 900,
     glow: 1.0, glowG: 0.8, // warm forward lobe of the aerial haze toward the Sun
-    hazeMaxDepth: 0.6, // cap on ground-haze optical depth (distant ridges stay aerial blue)
-    hazeDensity: 1.2e-3, // ground haze per metre at ground level (forest interiors, valleys)
+    hazeMaxDepth: 0.65, // cap on ground-haze optical depth (distant ridges stay aerial blue)
+    hazeDensity: 3.2e-3, // ground haze per metre at ground level (forest interiors, valleys)
     hazeHeight: 30, // metres above the ground
     hazeColor: '#8c7b78', // warm mauve-grey; turns gold toward the Sun
     hazeGlow: 1.0, hazeG: 0.6,
@@ -127,7 +142,7 @@ export default {
     // Far canopy crowns (lit colours): maple orange, beech gold, red maple, russet oak, aspen, turning green, spruce.
     farForest: ['#e0983a', '#e8c450', '#d0663a', '#c08a4a', '#eaaa40', '#b8b848', '#3a543a'],
     farForestWeights: [0.24, 0.2, 0.07, 0.14, 0.17, 0.08, 0.10],
-    canopyGap: '#5a4226', // umber-olive between crowns
+    canopyGap: '#6c5634', // umber-olive between crowns
     farFields: '#9aa346',
     ridge: '#7a6a80',
     wet: '#3b3427',
@@ -150,26 +165,39 @@ export default {
   // --- Vegetation (recipes for the procedural tree generator; palettes are display sRGB) ---
   vegetation: {
     atlasSize: 512, atlasSeed: 777,
+    // Levels of detail (metres): near cards fade out over nearOut; far cards fade in over the same
+    // band and out over farOut; beyond that the forest is the painted canopy on the terrain.
+    lod: { nearOut: [35, 45], farOut: [175, 245] },
+    pool: { near: 40, far: 520 }, // fixed instance pools per variant
+    canopyFade: [165, 245], // the painted canopy on the terrain takes over here
+    canopyLift: 11, // ... raised to crown height (m)
+    forest: {
+      seed: 3141, extent: 330, cell: 8, maxTrees: 2500, densityPower: 1.1,
+      clumpScale: 60, mix: 0.25, coniferThreshold: 0.42, scale: [0.7, 1.35],
+      bookmarkClearance: 5, heroClearance: 8,
+    },
     heroVariant: 0,
-    // Stage 4: the hero tree at the bookmarks [x, z, yaw, scale].
-    hero: [[42.05, -33.94, 0.6, 1.0], [-22.0, 76.7, 2.1, 1.05], [-36.3, 16.8, 4.0, 0.95]],
+    // Composition trees at the bookmarks [x, z, yaw, scale, variant].
+    hero: [[42.05, -33.94, 0.6, 1.0, 0], [-22.0, 76.7, 2.1, 1.05, 0], [-36.3, 16.8, 4.0, 0.95, 0]],
     variants: [
-      {
-        name: 'maple-orange', form: 'deciduous', seed: 11, neighbour: 4,
-        height: [16, 19], baseRadius: [0.42, 0.5], forkAt: [0.32, 0.4], leanDeg: 5, limbWobble: 0.5,
-        limbs: [4, 5], limbStart: 0.45, limbTilt: [40, 62], limbLength: [0.36, 0.48], clusterR: [2.1, 3.0], crown: 3,
-        nearCards: 250, cardSize: [0.95, 1.3], cells: [0, 1, 2, 3, 4, 5, 6, 7],
-        midCards: 70, midCardSize: [2.4, 3.2], midCells: [8, 9, 10, 11, 12, 13, 14, 15],
-        palette: { lit: '#e09a2a', mid: '#b8661e', interior: '#5a3c1c', glow: '#e4a419' },
-        bark: { base: '#9c8266', dark: '#705a54', moss: '#c0a830', mossShade: '#4b5020' }, glow: 2.2,
-      },
-      { name: 'beech-gold', form: 'deciduous', seed: 23, palette: { lit: '#f0cc40', mid: '#d09a22', interior: '#6e4a14', glow: '#f6dc50' } },
-      { name: 'red-maple', form: 'deciduous', seed: 37, palette: { lit: '#e0582a', mid: '#b0301e', interior: '#561812', glow: '#f07a2c' } },
-      { name: 'russet-oak', form: 'deciduous', seed: 41, palette: { lit: '#c68a40', mid: '#985626', interior: '#4a2814', glow: '#e0a048' } },
-      { name: 'aspen', form: 'deciduous', seed: 53, palette: { lit: '#f2a830', mid: '#d07a1e', interior: '#6e3a10', glow: '#f8c840' } },
-      { name: 'turning-green', form: 'deciduous', seed: 67, palette: { lit: '#c8c43c', mid: '#7e8e30', interior: '#34461c', glow: '#e0d840' } },
-      { name: 'spruce', form: 'conifer', seed: 71, palette: { lit: '#5a7040', mid: '#2e4a32', interior: '#18261c', glow: '#5a7040' }, glow: 0.1 },
-      { name: 'pine', form: 'conifer', seed: 83, palette: { lit: '#7a8040', mid: '#3e5434', interior: '#1c2a20', glow: '#7a8040' }, glow: 0.15 },
+      { ...DECIDUOUS, name: 'maple-orange', seed: 11, weight: 0.24, neighbour: 4,
+        palette: { lit: '#e09a2a', mid: '#b8661e', interior: '#5a3c1c', glow: '#e4a419' } },
+      { ...DECIDUOUS, name: 'beech-gold', seed: 23, weight: 0.2, neighbour: 4, height: [17, 21], limbTilt: [30, 50], clusterR: [2.0, 2.8],
+        palette: { lit: '#f0c840', mid: '#c89422', interior: '#5e4416', glow: '#f2d050' } },
+      { ...DECIDUOUS, name: 'red-maple', seed: 37, weight: 0.1, neighbour: 0, height: [13, 16], clusterR: [1.8, 2.5],
+        palette: { lit: '#e06a2a', mid: '#a8401e', interior: '#542818', glow: '#f0862c' } },
+      { ...DECIDUOUS, name: 'russet-oak', seed: 41, weight: 0.16, neighbour: 0, height: [15, 18], limbTilt: [50, 70], limbLength: [0.42, 0.55], baseRadius: [0.48, 0.58],
+        palette: { lit: '#c88c40', mid: '#985a26', interior: '#4a2c16', glow: '#e0a048' } },
+      { ...DECIDUOUS, name: 'aspen', seed: 53, weight: 0.18, neighbour: 1, height: [15, 19], baseRadius: [0.28, 0.36], limbTilt: [22, 40], clusterR: [1.6, 2.3],
+        bark: { base: '#b8ab98', dark: '#6e6470', moss: '#a8a038', mossShade: '#4b5020' },
+        palette: { lit: '#f2ac30', mid: '#cc7a1e', interior: '#5e3a14', glow: '#f6c840' } },
+      { ...DECIDUOUS, name: 'turning-green', seed: 67, weight: 0.12, neighbour: 1,
+        palette: { lit: '#c4c040', mid: '#7a8a30', interior: '#34441c', glow: '#dcd440' } },
+      { ...CONIFER, name: 'spruce', seed: 71, weight: 0.6,
+        palette: { lit: '#6a8048', mid: '#3e5a3a', interior: '#2a3a26', glow: '#7a9050' }, glow: 0.12 },
+      { ...CONIFER, name: 'pine', seed: 83, weight: 0.4, height: [16, 22], crownRadius: 3.4, tiers: 11,
+        bark: { base: '#9a6848', dark: '#5a4648', moss: '#8a9030', mossShade: '#3e4a1e' },
+        palette: { lit: '#808a48', mid: '#4a603c', interior: '#2c3a28', glow: '#909a50' }, glow: 0.15 },
     ],
   },
 

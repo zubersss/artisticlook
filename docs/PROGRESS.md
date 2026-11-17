@@ -213,6 +213,23 @@ twigs ≥ 5 cm and fewer; bark lit/shade by lighting (ochre ↔ mauve albedo, de
 doesn't make it orange), +0.8 mip bias on bark, warm ground bounce on the shade side; moss lit/shade
 pair on the north flank up to ~1.2 m and in crotches; gold rim colour.
 
+### Stage 5 (forest), round 1
+Gaps: (1) eye-level views a park of separate lollipop trees (sky 27–55 % of the top half), crown
+bottoms at one height, one-row wall at clearings, open hills at the vanishing point; (2) aerial
+canopy an even scatter of sequins (one crown spacing, cookie-cutter crowns, black gaps, scattered
+colours, seams); (3) trunks do not recede in lighter cooler planes, nearest darks neutral black;
+(4) painted far forest reads as a rug/ploughed fields, seam where 3D trees stop, too saturated;
+(5) conifers as topiary kebabs.
+Changes: forest placement uses full-cell jitter and random selection to the 2,500 cap (no raster
+order, no rows), scale 0.7–1.35 with smaller trees at thin edges; wider deciduous crowns (limbs
+45–70°, 0.42–0.56 H long, clusters 2.4–3.4 m, cards 1.05–1.45 m); ground haze 3.2e-3/m (trees at
+100 m carry ~35–45 % haze, planes recede) and aerial extinction 1.4e-4/m; warm umber floor on
+trunk shadows; painted crowns on two lattices (8 m single crowns near, 22 m stands far) with domed
+lit/shade sides, sizes 0.38–0.88 of the cell, meadow strips from a density field, lighter gaps;
+3D-tree far fade widened to 175–245 m and painted canopy 165–245 m (overlap), raised 11 m;
+conifers: 14 tiers tapering, overlapping clusters, smaller far cards (1.5–2 m), lighter greens.
+Budget after: ≤ 403k triangles, ≤ 51 draw calls, overdraw ≤ 1.35 shaded / 1.91 all.
+
 ## Phone results
 (pasted benchmark results from the owner's S23 Ultra, and the governor changes made)
 

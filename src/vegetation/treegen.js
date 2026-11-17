@@ -19,6 +19,11 @@ function frameFor(dir) {
 
 /** Tube along a polyline with per-point radius. */
 function addTube(out, pts, radii, sides, level, vStart, flare) {
+  if (out.simple) {
+    if (level >= 2) return; // far version: trunk and main limbs only
+    sides = Math.max(3, Math.round(sides * 0.5));
+    if (level > 0 && pts.length > 4) { const keep = [pts[0], pts[Math.floor(pts.length / 3)], pts[Math.floor(2 * pts.length / 3)], pts[pts.length - 1]]; radii = [radii[0], radii[Math.floor(radii.length / 3)], radii[Math.floor(2 * radii.length / 3)], radii[radii.length - 1]]; pts = keep; }
+  }
   const n = pts.length;
   const base = out.pos.length / 3;
   let v = vStart;
@@ -77,12 +82,12 @@ function addTwigs(out, c, len, r, rng) {
   }
 }
 
-export function generateTree(recipe, seed) {
+export function generateTree(recipe, seed, opts = {}) {
   const rng = new Rng(seed);
   const R = recipe;
   const H = rng.range(R.height[0], R.height[1]);
   const baseR = rng.range(R.baseRadius[0], R.baseRadius[1]);
-  const out = { pos: [], nrm: [], bark: [], idx: [] };
+  const out = { pos: [], nrm: [], bark: [], idx: [], simple: !!opts.simple };
   const clusters = [];
   const conifer = R.form === 'conifer';
 
@@ -109,13 +114,13 @@ export function generateTree(recipe, seed) {
     for (let t = 0; t < tiers; t++) {
       const f = 0.22 + 0.76 * (t / (tiers - 1));
       const y = f * H;
-      const rad = (1 - f) * R.crownRadius + 0.5;
-      const per = Math.max(3, Math.round(rad * 2.2));
+      const rad = Math.pow(1 - f, 0.85) * R.crownRadius + 0.35;
+      const per = Math.max(3, Math.round(rad * 2.6));
       for (let k = 0; k < per; k++) {
         const a = (k / per) * Math.PI * 2 + rng.next() * 0.6;
         const c = new THREE.Vector3(Math.cos(a) * rad * 0.55, y - rad * 0.15, Math.sin(a) * rad * 0.55);
         c.x += trunkPts[Math.min(segs, Math.round(f * segs))].x; c.z += trunkPts[Math.min(segs, Math.round(f * segs))].z;
-        clusters.push({ c, r: Math.max(0.8, rad * 0.55), flat: 0.55 });
+        clusters.push({ c, r: Math.max(0.7, rad * 0.62), flat: 0.85 });
       }
     }
     clusters.push({ c: trunkPts[segs].clone().add(new THREE.Vector3(0, -0.4, 0)), r: 0.9, flat: 1 });
@@ -135,7 +140,7 @@ export function generateTree(recipe, seed) {
       const pts = branchPoints(p0, dir, len, 6, 0.4, rng, R.limbWobble ?? 0.45);
       const r0 = trunkR[idx] * rng.range(0.5, 0.65);
       const limbR = pts.map((_, i) => r0 * Math.pow(1 - 0.85 * i / (pts.length - 1), 1.3));
-      addTube(out, pts, limbR, 6, 1, 0);
+      addTube(out, pts, limbR, 5, 1, 0);
       // Secondaries (2-3), each splitting once more into tertiaries.
       const nSec = 2 + rng.int(2);
       for (let s = 0; s < nSec; s++) {
@@ -145,7 +150,7 @@ export function generateTree(recipe, seed) {
         const sl = len * rng.range(0.35, 0.55);
         const sp = branchPoints(q0, sd, sl, 4, 0.25, rng, 0.5);
         const sr = limbR[Math.min(limbR.length - 1, k)] * 0.75;
-        addTube(out, sp, sp.map((_, i) => sr * (1 - 0.8 * i / (sp.length - 1))), 5, 2, 0);
+        addTube(out, sp, sp.map((_, i) => sr * (1 - 0.8 * i / (sp.length - 1))), 4, 2, 0);
         const tc = sp[sp.length - 1].clone();
         clusters.push({ c: tc, r: rng.range(R.clusterR[0], R.clusterR[1]) * 0.85, flat: 0.85 });
         addTwigs(out, tc, 1.6, sr * 0.3, rng);
@@ -208,13 +213,14 @@ export function buildCards(clusters, budget, cells, size, seed, opts = {}) {
   for (let i = n - 1; i > 0; i--) { const j = rng.int(i + 1); [order[i], order[j]] = [order[j], order[i]]; }
   order.forEach((ci, r) => { card[ci * 4 + 3] = (r + 0.5) / n; });
 
-  // Octagon cards: 8 corners + fan triangles (6 tris), fitted to the dab disc.
-  const V = 8;
+  // Octagon cards (8 corners, 6 tris) fitted to the dab disc for near trees (they save
+  // fill rate); plain quads (2 tris) for far trees, where vertex cost matters more.
+  const V = opts.quads ? 4 : 8;
   const pos = new Float32Array(n * V * 3), corner = new Float32Array(n * V * 2);
   const aCl = new Float32Array(n * V * 4), aCard = new Float32Array(n * V * 4), aTint = new Float32Array(n * V * 4);
   const idx = [];
   const oct = [];
-  for (let i = 0; i < V; i++) { const a = (i / V) * Math.PI * 2 + Math.PI / 8; oct.push([Math.cos(a) / Math.cos(Math.PI / 8), Math.sin(a) / Math.cos(Math.PI / 8)]); }
+  for (let i = 0; i < V; i++) { const a = (i / V) * Math.PI * 2 + Math.PI / V; oct.push([Math.cos(a) / Math.cos(Math.PI / V), Math.sin(a) / Math.cos(Math.PI / V)]); }
   for (let q = 0; q < n; q++) {
     for (let i = 0; i < V; i++) {
       const o = q * V + i;
