@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#1b1712" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Painted Worlds</title>
+</head>
+<body>
+  <div id="app">
+    <canvas id="view" aria-label="Painted landscape"></canvas>
+
+    <div id="loading" class="screen">
+      <div class="panel">
+        <div class="title">Painted Worlds</div>
+        <div id="loading-text" class="sub">Preparing paint…</div>
+        <div class="bar"><div id="loading-bar"></div></div>
+      </div>
+    </div>
+
+    <div id="start" class="screen hidden">
+      <div class="panel">
+        <div class="title">Painted Worlds</div>
+        <div class="sub">Tap to start</div>
+        <div class="hint">Left thumb: move · Right thumb: look</div>
+      </div>
+    </div>
+
+    <div id="ctxlost" class="screen hidden">
+      <div class="panel">
+        <div class="title">Graphics were reset</div>
+        <div class="sub">Tap to reload</div>
+      </div>
+    </div>
+
+    <div id="rotate" class="hidden">Turn your phone sideways</div>
+
+    <div id="hud" class="hidden">
+      <div><b id="hud-fps">–</b> fps · <span id="hud-ms">–</span> ms</div>
+      <div>res <span id="hud-res">–</span> · <span id="hud-gov">–</span></div>
+      <div><span id="hud-calls">–</span> calls · <span id="hud-tris">–</span> tris</div>
+      <div id="hud-extra"></div>
+      <div class="dim">build <span id="hud-commit">–</span></div>
+    </div>
+
+    <div id="buttons" class="hidden">
+      <button data-act="bookmark" title="Next view (B)"><span>View</span><small id="lbl-bookmark">path</small></button>
+      <button data-act="mode" title="Walk / fly (F)"><span>Move</span><small id="lbl-mode">walk</small></button>
+      <button data-act="time" title="Time of day (T)"><span>Time</span><small id="lbl-time">late pm</small></button>
+      <button data-act="look" title="Lighting view (V)"><span>Look</span><small id="lbl-look">painted</small></button>
+      <button data-act="quality" title="Quality (Q)"><span>Quality</span><small id="lbl-quality">auto 60</small></button>
+      <button data-act="hud" title="HUD (H)"><span>HUD</span><small id="lbl-hud">off</small></button>
+      <button data-act="bench" title="Benchmark"><span>Bench</span><small id="lbl-bench">3 min</small></button>
+    </div>
+
+    <div id="stick-base" class="hidden"><div id="stick-knob"></div></div>
+
+    <div id="bench" class="screen hidden">
+      <div class="panel wide">
+        <div class="title">Benchmark</div>
+        <pre id="bench-text"></pre>
+        <div class="row">
+          <button id="bench-copy">Copy results</button>
+          <button id="bench-close">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="bench-menu" class="screen hidden">
+      <div class="panel">
+        <div class="title">Benchmark</div>
+        <div class="sub">Flies a scripted route through every view.</div>
+        <div class="row">
+          <button id="bench-3">Run 3 min</button>
+          <button id="bench-10">10 min soak</button>
+          <button id="bench-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="bench-banner" class="hidden">Benchmark running… <span id="bench-progress"></span> <button id="bench-stop">Stop</button></div>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

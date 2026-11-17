@@ -1,0 +1,24 @@
+{
+  "name": "painted-solar-system",
+  "version": "1.0.0",
+  "description": "Painted-realism exploration of the solar system (three.js, WebGL 2)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "shots": "node scripts/shots.mjs",
+    "stability": "node scripts/shots.mjs --stability"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zubersss/artisticlook.git"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8"
+  },
+  "type": "module",
+  "private": true
+}
