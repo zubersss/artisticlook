@@ -44,7 +44,9 @@ void main() {
   float f = min(fin, fout);
   float keep = clamp((f - aCard.w * 0.5) * 2.0, 0.0, 1.0);
   float size = aCard.z * sc * uCardScale * keep * smoothstep(1.2, 3.2, d);
-  if (aCard.w > uRankCut) size = 0.0;
+  // Governor thinning: cards above the rank cut shrink away smoothly; the rest grow a
+  // little to keep the crown's coverage.
+  size *= (1.0 - smoothstep(uRankCut - 0.06, uRankCut, aCard.w)) * mix(1.0, 1.3, 1.0 - uRankCut);
   vec4 mv = viewMatrix * c;
   float cr = cos(aCard.y), sr = sin(aCard.y);
   vec2 off = mat2(cr, sr, -sr, cr) * aCorner * (0.5 * size);
@@ -374,6 +376,14 @@ export class Trees {
   }
 
   applyQuality(state) {
-    this.uniforms.uRankCut.value = state.canopyQuads ?? 1;
+    this.rankTarget = state.canopyQuads ?? 1;
+    if (this.uniforms.uRankCut.value === undefined) this.uniforms.uRankCut.value = this.rankTarget;
+  }
+
+  update(ctx) {
+    // Ease governor changes over ~1.5 s so canopies never pop.
+    const u = this.uniforms.uRankCut;
+    const t = this.rankTarget ?? 1;
+    u.value += (t - u.value) * Math.min(1, ctx.dt * 2);
   }
 }
