@@ -74,7 +74,11 @@ void main() {
   float chord = max(0.0, -b + sqrt(max(b * b - q, 0.0)));
   float crownDepth = clamp(length(c.xyz - crownC) / (uCrown.w * sc), 0.0, 1.0);
   // Shadow at the card centre, nudged toward the Sun past the card's own caster.
+#ifdef SHADOW_CASTER
+  vSun = 1.0; // never sample the shadow map while rendering into it
+#else
   vSun = sunShadow(c.xyz + uSunDir * 1.6, normalize(c.xyz - cc + 1e-4), 0.0);
+#endif
   // Painted leaves are thin: light carries a long way through a crown, strongest at its rim.
   vGlow = vec4(vec3(exp(-0.22 * chord) * mix(0.6, 1.25, smoothstep(0.45, 0.95, crownDepth))), aTint.w * mix(0.55, 1.0, smoothstep(0.35, 0.85, crownDepth)));
 }`;
@@ -509,9 +513,9 @@ export class Trees {
       let n = 0;
       for (let i = 0; i < this.count; i++) if (this.tv[i] === v) n++;
       n = Math.max(1, n);
-      const u = Object.assign({}, this.shared, vr.per, noFade, { uCardScale: { value: 0.85 } });
+      const u = Object.assign({}, this.shared, vr.per, noFade, { uCardScale: { value: 0.72 } }); // smaller -> sun flecks through the crowns
       const cardMat = makeMaterial({
-        name: 'shadow.cards', chunks: [GLSL_LIGHTING], uniforms: u,
+        name: 'shadow.cards', chunks: [GLSL_LIGHTING], uniforms: u, defines: { SHADOW_CASTER: 1 },
         vertex: CARD_VERT,
         fragment: /* glsl */ `
           uniform sampler2D tDabs;

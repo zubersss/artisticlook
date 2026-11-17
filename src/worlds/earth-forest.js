@@ -59,7 +59,8 @@ export default {
     distanceMix: 0.75, // how far inscatter is pushed toward the distance hue (0..1)
     chromaKeep: 0.85, // haze keeps this much chroma (passes through mauve, not grey)
     shadowHue: '#5b5fae', // violet-blue fill in shadows
-    shadowFill: 0.2, // how strongly shadows take the hue (0..1)
+    shadowFill: 0.35, // how strongly shadows take the hue (0..1)
+    castShadowLift: 1.4, // reflected light lifting cast shadows on sunward faces
     distanceHue: '#7e82b6', // cool blue-violet that distance shifts toward
     glowHue: '#ffc27a', // warm haze toward the Sun
     sunWarmth: '#fff6e8', // multiplies direct sunlight (slightly warm)

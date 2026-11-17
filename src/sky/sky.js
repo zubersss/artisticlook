@@ -107,7 +107,7 @@ export class Sky {
     lin(P.shadowHue, 1, G.uShadowHue.value);
     lin(P.distanceHue, 1, G.uDistanceHue.value);
     lin(P.glowHue, 1, G.uGlowHue.value);
-    G.uPainter.value.set(P.shadowFill, P.aerialScale, 0, P.strokeStrength);
+    G.uPainter.value.set(P.shadowFill, P.aerialScale, P.castShadowLift ?? 0, P.strokeStrength);
     G.uFog.value.set(F.hazeDensity, 1 / F.hazeHeight, F.hazeMaxDepth ?? 1.2, F.hazeG);
     G.uFog2.value.set(F.glow, F.hazeGlow, 0, 0);
     G.uAtmo.value.x = F.aerialExtinction;

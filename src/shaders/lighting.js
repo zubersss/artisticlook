@@ -161,6 +161,10 @@ vec3 painterLight(vec3 albedo, vec3 N, float shadow, float ao) {
   amb = mix(amb, vec3(luma(amb)) * vec3(1.05, 0.98, 0.9), 0.5 * k) * mix(1.0, 0.8, k);
   vec3 hueN = uShadowHue / max(luma(uShadowHue), 1e-4);
   vec3 fill = amb * mix(vec3(1.0), hueN, uPainter.x * k * (1.0 - lit)) * mix(1.0, ao, 0.85);
+  // Cast shadow on a sunward face: a painter lifts it with reflected light from the sunlit
+  // surroundings so shadows keep colour and form (lit : shadow ~ 5 : 1, not 15 : 1).
+  float castShade = (1.0 - shadow) * saturate(ndl + 0.2);
+  fill *= 1.0 + uPainter.z * castShade * k;
   vec3 col = a2 * (sun + fill);
   // Shadows deepen in hue and chroma, not only in value.
   if (k > 0.5) col = chromaScale(col, 1.0 + 0.1 * (1.0 - lit));
