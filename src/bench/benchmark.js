@@ -21,7 +21,7 @@ export class Benchmark {
     this.heightAt = heightAt;
     this.active = false;
     this.samples = new Float32Array(60 * 60 * 11); // up to 11 minutes at 60 fps
-    this.res = new Uint16Array(this.samples.length);
+    this.res = new Float32Array(this.samples.length); // rendered megapixels per frame
     this.n = 0;
     this.buildRoute();
   }
@@ -89,7 +89,8 @@ export class Benchmark {
     return out;
   }
 
-  record(intervalMs, longSide, dt) {
+  record(intervalMs, megapixels, dt) {
+    const longSide = megapixels;
     if (!this.active) return false;
     if (this.n < this.samples.length) {
       this.samples[this.n] = intervalMs;
@@ -120,10 +121,11 @@ export class Benchmark {
       `avg fps        ${avgFps.toFixed(1)}`,
       `1% low fps     ${low1.toFixed(1)}  (p99 frame ${p99.toFixed(1)} ms)`,
       `frames         ${n}  over ${(total / 1000).toFixed(1)} s`,
-      `render res     avg ${(resSum / Math.max(1, n)).toFixed(0)}  min ${this.minRes === 1e9 ? '-' : this.minRes} (long side)`,
+      `render res     avg ${(resSum / Math.max(1, n)).toFixed(2)} MP  min ${this.minRes === 1e9 ? '-' : this.minRes.toFixed(2)} MP  (native ${info.native})`,
       `governor       ${this.gov.steps - this.govSteps0} steps (${this.gov.stepsDown - this.govDown0} down, ${this.gov.stepsUp - this.govUp0} up), end ${this.gov.label()}`,
       `target         ${info.targetFps} fps cap, display ~${info.vsyncHz} Hz`,
       `GPU            ${info.gpu}`,
+      `mode           ${info.mode}`,
       `HDR / MSAA     ${info.hdr} / ${info.samples}x`,
       `screen         ${info.screen}  dpr ${info.dpr}  canvas ${info.canvas}`,
       `three.js       r${info.three}`,

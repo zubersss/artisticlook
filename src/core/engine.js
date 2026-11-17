@@ -299,6 +299,8 @@ export class Engine {
       gpu: this.caps.renderer, hdr: this.caps.hdr.name, samples: this.caps.samples,
       screen: `${screen.width}x${screen.height} (view ${window.innerWidth}x${window.innerHeight})`, dpr: (window.devicePixelRatio || 1).toFixed(3),
       canvas: `${this.outW}x${this.outH}`, three: this.caps.three, commit: typeof __COMMIT__ !== 'undefined' ? __COMMIT__ : 'dev',
+      native: `${this.nativeW}x${this.nativeH} = ${((this.nativeW * this.nativeH) / 1e6).toFixed(2)} MP`,
+      mode: `${this.governor.sharp ? 'Sharp (30 fps)' : 'Smooth (60 fps)'}${this.calibrationMs ? `, startup test ${this.calibrationMs.toFixed(1)} ms/frame` : ''}`,
     }) + (aborted ? '\n(stopped early)' : '');
     this.ui.benchRunning(false);
     this.ui.showBench(text);
@@ -369,7 +371,7 @@ export class Engine {
     else if (g === 'fps30') this.loop.setTargetFps(this.governor.targetFps / 2);
     else if (g === 'fps60') this.loop.setTargetFps(this.governor.targetFps);
     if (this.bench.active) {
-      const done = this.bench.record(intervalMs, Math.max(this.intW, this.intH), dt);
+      const done = this.bench.record(intervalMs, (this.intW * this.intH) / 1e6, dt);
       if ((this.benchFrame = (this.benchFrame || 0) + 1) % 30 === 0) this.ui.benchRunning(true, this.bench.progress());
       if (done) this.stopBench(false);
     }
