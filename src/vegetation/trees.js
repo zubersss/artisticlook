@@ -220,7 +220,7 @@ const TRUNK_FRAG = /* glsl */ `
           float shadeSide = saturate(0.3 - dot(N, uSunDir));
           col += alb * (uSkyHorizon * 0.05 + uGroundBounce * 0.35) * shadeSide * painterK();
           if (uViewMode > 0.5) {
-            col = chromaScale(col, 1.0 + 0.35 * shadeSide);
+            col = shadeHue(col, shadeSide * 0.9);
             // Never neutral black: floor at a warm umber ~25 % of the sunlit bark value.
             float L = luma(col), litL = luma(uBarkLit * uSunColor) * 0.6;
             vec3 umber = vec3(0.034, 0.02, 0.01) / 0.0215;

@@ -279,6 +279,20 @@ umber floor lowered (dark silhouettes); far shadow map 4 taps over 1.5 texels; p
 leaf-card shadow casters sampled the map they were drawing into (drawn as nothing); they now compile
 with SHADOW_CASTER.
 
+### Stage 6 (shadows), round 2
+Gaps: (1) grass shade far too light (lit:shade 1.5–2.4:1), shade keeps the lit hue; (2) sun flecks
+dissolve into stroke confetti, pale grey-mint chips in shade; (3) shadow on warm materials goes
+rose/oxblood (path slate-rose, litter magenta), path sun pools lost; (4) trunks oxblood and flat,
+backlit hero trunk milky; (5) aerial crowns cast no shade, backlit view too bright, halo over the
+0.94 limit with a salmon ring.
+Changes: a painter's shadow hue rule in Oklab (`shadeHue`): in cast shadow and on faces turned from
+the Sun, yellow-greens rotate ~24° toward blue-green and warm hues (reds, oranges, browns, rose) are
+pulled to burnt umber; the multiplicative violet fill is now only a 12 % tint; cast-shadow lift 0.5;
+stroke value jitter and gold accents reduced in shade, sky flecks only in sunlight; trunk chroma boost
+replaced by the umber hue rule; near dark forms get 65 % less bloom veil; halo core boost halved and
+skirt turned gold-peach; painted crowns throw a shadow pool into the gap on their far side from the
+Sun; exposure key 0.13. Measured bottom-quarter luma: path 0.28, clearing 0.33 (target 0.26–0.35).
+
 ## Phone results
 (pasted benchmark results from the owner's S23 Ultra, and the governor changes made)
 

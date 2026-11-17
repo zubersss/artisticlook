@@ -132,7 +132,7 @@ vec3 paintSky(vec3 c, vec3 dir) {
   float cT = mix(cS, cH, skirt);
   if (cM > 1e-5) mO.yz *= cT / cM;
   vec3 mixed = fromOklab(mO);
-  mixed *= 1.0 + 0.6 * core;
+  mixed *= 1.0 + 0.3 * core;
   // Gold haze low on the horizon under the Sun.
   float gold = (1.0 - smoothstep(0.0, 0.16, el)) * smoothstep(0.55, 0.95, mu);
   mixed = mix(mixed, uGlowHue * luma(mixed) * 0.95 / max(luma(uGlowHue), 1e-4), gold * 0.55);
@@ -143,6 +143,27 @@ vec3 paintSky(vec3 c, vec3 dir) {
 float hgPhase(float mu, float g) {
   float g2 = g * g;
   return (1.0 - g2) / (4.0 * PI * pow(max(1e-4, 1.0 + g2 - 2.0 * g * mu), 1.5));
+}
+
+// Painter's shadow hue rule (Oklab hue angles): greens and yellows lean toward blue-green,
+// warm colours (reds, oranges, browns, rose) are pulled to burnt umber - never rose or oxblood.
+vec3 shadeHue(vec3 c, float w) {
+  if (w <= 0.0) return c;
+  vec3 o = toOklab(c);
+  float C = length(o.yz);
+  if (C < 1e-4) return c;
+  float hd = degrees(atan(o.z, o.y));
+  if (hd < 0.0) hd += 360.0;
+  float target;
+  if (hd >= 85.0 && hd < 200.0) target = hd + 24.0;      // yellow-green -> green / blue-green
+  else if (hd >= 200.0 && hd < 300.0) target = hd;        // blues stay
+  else target = 62.0;                                      // warm (incl. rose/magenta) -> umber
+  float d = target - hd;
+  if (d > 180.0) d -= 360.0;
+  if (d < -180.0) d += 360.0;
+  float hn = radians(hd + d * clamp(w, 0.0, 1.0));
+  o.yz = vec2(cos(hn), sin(hn)) * C;
+  return max(fromOklab(o), vec3(0.0));
 }
 
 // ---- Painter's light (docs/ART_DIRECTION.md section 2).
@@ -170,14 +191,16 @@ vec3 painterLight(vec3 albedo, vec3 N, float shadow, float ao) {
   // Elsewhere painters warm the fill a little (umber-olive form shadows).
   amb = mix(amb, vec3(luma(amb)) * vec3(1.05, 0.98, 0.9), 0.5 * k * (1.0 - castShade)) * mix(1.0, 0.8, k * (1.0 - castShade));
   vec3 hueN = uShadowHue / max(luma(uShadowHue), 1e-4);
-  vec3 fill = amb * mix(vec3(1.0), hueN, uPainter.x * k * (1.0 - lit)) * mix(1.0, ao, 0.85 * (1.0 - 0.5 * castShade));
+  vec3 fill = amb * mix(vec3(1.0), hueN, 0.12 * k * (1.0 - lit)) * mix(1.0, ao, 0.85 * (1.0 - 0.5 * castShade));
   // Mostly neutral with a modest cool lean (shaded grass reads olive / blue-green, not teal).
   vec3 skyN = uSkyZenith / max(luma(uSkyZenith), 1e-4);
   vec3 skyCool = mix(vec3(1.0), mix(skyN, hueN, 0.4), 0.3) * luma(uSkyZenith + uSkyHorizon);
   fill += skyCool * uPainter.z * castShade * k * mix(1.0, ao, 0.5);
   vec3 col = a2 * (sun + fill);
   // Shadows deepen in hue and chroma, not only in value.
-  if (k > 0.5) col = chromaScale(col, 1.0 + 0.1 * (1.0 - lit) + 0.25 * castShade);
+  // The hue rule acts on cast shadow and on faces turned from the Sun, never on lit ground.
+  float shadeW = max(1.0 - shadow, 1.0 - smoothstep(-0.15, 0.2, ndl));
+  if (k > 0.5) col = shadeHue(chromaScale(col, 1.0 + 0.1 * (1.0 - lit) + 0.25 * castShade), shadeW * uPainter.x);
   return col;
 }
 

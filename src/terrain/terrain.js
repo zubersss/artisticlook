@@ -269,8 +269,13 @@ export class Terrain {
           crown = mix(chromaScale(crown * vec3(0.74, 0.64, 0.54), 1.1), crown * 1.08, lit);
           float sunward = saturate(dot(normalize(q + 1e-4), normalize(uSunDir.xz + 1e-4)));
           crown = mix(crown, uGlowHue * luma(crown) * 1.9, sunward * smoothstep(0.4, 0.95, best) * 0.7);
-          // Gaps are the canopy's own shadow, not the forest floor.
+          // Gaps are the canopy's own shadow, not the forest floor; the crown throws a darker
+          // shadow pool into the gap on its far side from the Sun.
           vec3 gapCol = mix(groundAlb, mix(uCanopyGap, crown * vec3(0.66, 0.58, 0.5), 0.6), smoothstep(0.35, 0.75, forest) * exists);
+          vec2 sxz = normalize(uSunDir.xz + 1e-4);
+          vec2 qs = (p - (bc - sxz * br * 0.9)) / br;
+          float pool = (1.0 - smoothstep(0.75, 1.15, length(qs))) * exists;
+          gapCol *= mix(1.0, 0.55, pool);
           outCol = mix(gapCol, crown, inside);
           outN = normalize(mix(N, Ns, inside));
           outAO = mix(0.85, mix(0.88, 1.0, z), inside);
@@ -377,6 +382,7 @@ export class Terrain {
             jitter = mix(jitter, radians(16.0), smoothstep(0.3, 0.7, pathM)); // calm strokes across the path
             BrushOut b = brushSample(vRel.xz, dist, theta, jitter, abs(dot(vRel / dist, N)));
             strokeH = b.h;
+            float shPre = mix(sunShadow(vRel, N, strokeH - 0.5), 1.0, canopyW);
             // Broken colour per stroke, plus broad colour zones (32 m).
             float hueJ = mix(16.0, 22.0, max(litterW * (1.0 - canopyW), smoothstep(0.2, 0.7, pathM)));
             // Path: calm earth in broad strokes across it; fallen leaves (~10 %, more in 4 m
@@ -388,7 +394,8 @@ export class Terrain {
             alb = mix(alb, pathPaint, pathEdge * smoothstep(0.1, 0.4, pathM));
             float strayLeaf = step(0.985, fract(b.id * 5.17 + 0.3)) * (1.0 - litterW) * smoothstep(0.0, 0.2, pathM + 0.1);
             alb = mix(alb, uPathFleck * 1.15, max(leafSel * pathEdge, strayLeaf) * (1.0 - farPath));
-            alb = brokenColor(alb, b.id, hueJ * 1.4, 0.22, 0.2);
+            // Calmer value jitter in shade so sun flecks read as shapes, not confetti.
+            alb = brokenColor(alb, b.id, hueJ * 1.4, 0.22, 0.2 * mix(0.3, 1.0, shPre));
             // Patch-scale light and dark (4 m and 16 m): lit and shaded families in the grass.
             float patchV = (vnoise(wp.xz * 0.25 + 7.0) - 0.5) * 0.7 + (vnoise(wp.xz * 0.0625 + 3.0) - 0.5) * 0.5;
             alb *= 1.0 + patchV * 0.45;
@@ -398,13 +405,13 @@ export class Terrain {
             float under = step(fract(b.id * 7.77 + 0.13), 0.18);
             float accent = step(0.93, fract(b.id * 2.39 + 0.61));
             alb = mix(alb, uGrassShade * 0.62, under * grassW * 0.85);
-            alb = mix(alb, uGrassAccent, accent * grassW * 0.8);
+            alb = mix(alb, uGrassAccent, accent * grassW * 0.8 * shPre);
             // Thin paint at stroke ends shows a little of the darker layer (no hard seams).
             alb = mix(alb * vec3(0.8, 0.84, 0.76), alb, smoothstep(0.0, 0.3, b.h));
             // Colour zones at two scales (32 m and 8 m): neighbouring strokes share a family.
             vec2 zn = vnoise4(wp.xz * (1.0 / 32.0) + 91.0).xy - 0.5;
             vec2 zn2 = vnoise4(wp.xz * 0.125 + 47.0).zw - 0.5;
-            alb = oklabJitter(alb, zn.x * radians(12.0) + zn2.x * radians(10.0), zn2.y * 0.25, zn.y * 0.14 + zn2.y * 0.08);
+            alb = oklabJitter(alb, zn.x * radians(12.0) + zn2.x * radians(10.0), zn2.y * 0.25, (zn.y * 0.14 + zn2.y * 0.08) * mix(0.4, 1.0, shPre));
             // ~2 % of strokes borrow a neighbouring material: fallen leaves in grass.
             // (borrowing happens before lighting; flecks after it)
             float borrow = smoothstep(0.925, 0.932, b.id) * (1.0 - smoothstep(0.94, 0.945, b.id));
@@ -420,7 +427,7 @@ export class Terrain {
           if (uViewMode > 1.5) {
             // Flecks: dark blue-green shadow strokes in shade; warm lit dabs (and a few cool
             // sky notes) in light.
-            float litE = saturate(dot(N, uSunDir) * 2.5);
+            float litE = saturate(dot(N, uSunDir) * 2.5) * step(0.5, sh);
             vec3 sh = uShadowHue / max(luma(uShadowHue), 1e-4) * luma(col) * 0.6;
             sh = mix(sh, vec3(0.06, 0.12, 0.1) * luma(col) * 4.0, 0.5);
             float coolNote = step(0.97, fract(strokeH * 7.3 + 0.5));

@@ -59,8 +59,8 @@ export default {
     distanceMix: 0.75, // how far inscatter is pushed toward the distance hue (0..1)
     chromaKeep: 0.85, // haze keeps this much chroma (passes through mauve, not grey)
     shadowHue: '#5b5fae', // violet-blue fill in shadows
-    shadowFill: 0.35, // how strongly shadows take the hue (0..1)
-    castShadowLift: 0.9, // cool sky + reflected light filling cast shadows on sunward faces
+    shadowFill: 0.8, // strength of the painter's shadow hue rule (greens -> blue-green, warms -> umber)
+    castShadowLift: 0.5, // cool sky + reflected light filling cast shadows on sunward faces
     distanceHue: '#7e82b6', // cool blue-violet that distance shifts toward
     glowHue: '#ffc27a', // warm haze toward the Sun
     sunWarmth: '#fff6e8', // multiplies direct sunlight (slightly warm)
@@ -83,7 +83,7 @@ export default {
   // --- Post / grade ---
   post: {
     // Auto-exposure maps the clamped log-average to this key (median ~0.40 display).
-    exposureKey: 0.17, exposureMin: -8, exposureMax: 8, exposureTau: 2.0, exposureBias: 0.0, exposureFallback: -1.5,
+    exposureKey: 0.13, exposureMin: -8, exposureMax: 8, exposureTau: 2.0, exposureBias: 0.0, exposureFallback: -1.5,
     // Lottes 2016 curve on the max channel: T(mid) = midOut, T(white) = 1.
     curveA: 1.38, curveD: 0.96, curveMid: 0.18, curveMidOut: 0.21, curveWhite: 10,
     bloomStrength: 0.09, bloomKnee: 0.7, bloomTint: [1.0, 0.9, 0.75], shaftStrength: 0.5, shaftColor: [1.0, 0.8, 0.5],
@@ -221,7 +221,7 @@ export default {
     lift: 2.1, // painters make the sky the lightest large mass
     refScale: 1.15, // overall brightness of the painted dome
     hueBlend: 0.82, // how far sky hues and values are pulled toward the painted palette below
-    haloSkirt: '#e4c8b8', // peach between the cream core and the blue
+    haloSkirt: '#e8d0a6', // warm gold-peach between the cream core and the blue
     zenithHue: '#8494c6', horizonHue: '#b9c7da', nearSunHue: '#ecdcc0', horizonCream: '#ddd8d0',
     haloCos: 0.88, // warm halo fades out ~28 degrees from the Sun (steep falloff)
     discDisplay: 3.2, // pre-curve value of the painted Sun disc (cream, never pure white)

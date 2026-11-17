@@ -267,8 +267,11 @@ void main() {
 
   // Bloom and shafts arrive pre-scaled in one quarter-res texture.
   vec4 bs = texture(tBloom, uv * uBloomSrc.xy);
-  float airLen = saturate(sceneDistAt(suv, c0) / 250.0);
-  c += bs.rgb + uShaftColor * bs.a * airLen; // thresholded glow is purely additive
+  float dHere = sceneDistAt(suv, c0);
+  float airLen = saturate(dHere / 250.0);
+  // A painter keeps near dark forms dark against the light: the glow veils them less.
+  float darkNear = (1.0 - smoothstep(5.0, 60.0, dHere)) * (1.0 - smoothstep(0.02, 0.25, luma(c) * vExpo));
+  c += (bs.rgb + uShaftColor * bs.a * airLen) * (1.0 - 0.65 * darkNear);
 
   c *= vExpo;
 
