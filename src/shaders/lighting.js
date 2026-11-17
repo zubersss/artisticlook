@@ -41,12 +41,18 @@ float sunShadow(vec3 rel, vec3 nrm, float edge) {
     vec4 c1 = uShadowM1 * vec4(pf, 1.0);
     vec3 s1 = c1.xyz * 0.5 + 0.5;
     vec3 e1 = abs(c1.xyz);
-    if (max(e1.x, e1.y) < 1.0 && e1.z < 1.0) sh1 = texture(uShadow1, s1);
+    if (max(e1.x, e1.y) < 1.0 && e1.z < 1.0) {
+      // Far map: 4 taps over ~1.5 texels (wide, filtered penumbra; no saw-tooth).
+      vec2 o1 = uShadowT.zw * 1.5;
+      sh1 = 0.25 * (texture(uShadow1, vec3(s1.xy + vec2(-o1.x, -o1.y), s1.z)) + texture(uShadow1, vec3(s1.xy + vec2(o1.x, -o1.y), s1.z))
+                  + texture(uShadow1, vec3(s1.xy + vec2(-o1.x, o1.y), s1.z)) + texture(uShadow1, vec3(s1.xy + vec2(o1.x, o1.y), s1.z)));
+    }
     sh1 = mix(sh1, 1.0, smoothstep(0.85, 1.0, max(e1.x, e1.y)));
   }
   float sh = mix(sh1, sh0, in0);
   // Brushed edge: the stroke's paint height pushes the shadow boundary in or out.
-  return smoothstep(0.2, 0.8, sh + edge * 0.6);
+  // Half-shade across the penumbra (no binary stroke flip): the stroke height only nudges it.
+  return smoothstep(0.05, 0.95, sh + edge * 0.3 * (1.0 - abs(sh * 2.0 - 1.0)));
 }
 
 
@@ -157,17 +163,21 @@ vec3 painterLight(vec3 albedo, vec3 N, float shadow, float ao) {
   vec3 Lflat = normalize(vec3(uSunDir.x, 0.0, uSunDir.z) + vec3(0.0, 1e-4, 0.0));
   vec3 amb = mix(uGroundBounce, uSkyZenith, 0.5 + 0.5 * N.y);
   amb += 0.12 * uSkyHorizon * max(dot(N, -Lflat), 0.0) * k;
-  // Painters warm the fill: half the sky's blue goes, shadows read umber-olive with a cool edge.
-  amb = mix(amb, vec3(luma(amb)) * vec3(1.05, 0.98, 0.9), 0.5 * k) * mix(1.0, 0.8, k);
+  // Cast shadow on a face that would be sunlit: a painter fills it with cool sky light and
+  // reflected light from the sunlit surroundings, so shadows keep colour and form
+  // (lit : shadow ~ 5 : 1, not 20 : 1) and shift 15-40 deg toward blue-green.
+  float castShade = (1.0 - shadow) * saturate(ndl * 2.0 + 0.3);
+  // Elsewhere painters warm the fill a little (umber-olive form shadows).
+  amb = mix(amb, vec3(luma(amb)) * vec3(1.05, 0.98, 0.9), 0.5 * k * (1.0 - castShade)) * mix(1.0, 0.8, k * (1.0 - castShade));
   vec3 hueN = uShadowHue / max(luma(uShadowHue), 1e-4);
-  vec3 fill = amb * mix(vec3(1.0), hueN, uPainter.x * k * (1.0 - lit)) * mix(1.0, ao, 0.85);
-  // Cast shadow on a sunward face: a painter lifts it with reflected light from the sunlit
-  // surroundings so shadows keep colour and form (lit : shadow ~ 5 : 1, not 15 : 1).
-  float castShade = (1.0 - shadow) * saturate(ndl + 0.2);
-  fill *= 1.0 + uPainter.z * castShade * k;
+  vec3 fill = amb * mix(vec3(1.0), hueN, uPainter.x * k * (1.0 - lit)) * mix(1.0, ao, 0.85 * (1.0 - 0.5 * castShade));
+  // Mostly neutral with a modest cool lean (shaded grass reads olive / blue-green, not teal).
+  vec3 skyN = uSkyZenith / max(luma(uSkyZenith), 1e-4);
+  vec3 skyCool = mix(vec3(1.0), mix(skyN, hueN, 0.4), 0.3) * luma(uSkyZenith + uSkyHorizon);
+  fill += skyCool * uPainter.z * castShade * k * mix(1.0, ao, 0.5);
   vec3 col = a2 * (sun + fill);
   // Shadows deepen in hue and chroma, not only in value.
-  if (k > 0.5) col = chromaScale(col, 1.0 + 0.1 * (1.0 - lit));
+  if (k > 0.5) col = chromaScale(col, 1.0 + 0.1 * (1.0 - lit) + 0.25 * castShade);
   return col;
 }
 

@@ -264,6 +264,21 @@ the far painted forest at eye level is still finer-grained than the paintings' d
 conifers at mid distance still a little columnar. Revisit in milestone 2 ("close the biggest gaps").
 Stability: 3-frame sequences at all bookmarks show consistent, smooth edge motion; no boiling.
 
+### Stage 6 (shadows), round 1
+Gaps: (1) cast shadows crushed to flat grey-black (#1C1915, lit:shade 20:1); (2) no dark frame in
+path/clearing views (bottom-quarter luma 0.48/0.61 vs 0.26–0.35), floating shadow blots;
+(3) contre-jour trunks lifted to tan above their own cast shadows; (4) grass shadows warm instead of
+cooling toward blue-green; (5) mosaic penumbras (whole strokes flip), eroded sun flecks, saw-tooth
+far-map streaks.
+Changes: cast shadow on would-be-sunlit faces filled with a mostly neutral, slightly cool sky light
+(castShadowLift 0.9), no warm desaturation or AO crush there, +25 % chroma; four new composition
+trees sunward of the path and clearing views (data) so their crowns throw broken shade across the
+foreground (path bottom quarter now median 0.31, 35 % below 0.25); trunk shade fill reduced and
+umber floor lowered (dark silhouettes); far shadow map 4 taps over 1.5 texels; penumbra is half-shade
+(smoothstep 0.05–0.95, stroke height nudges ±0.15 only inside the penumbra). Fixed a feedback loop:
+leaf-card shadow casters sampled the map they were drawing into (drawn as nothing); they now compile
+with SHADOW_CASTER.
+
 ## Phone results
 (pasted benchmark results from the owner's S23 Ultra, and the governor changes made)
 

@@ -60,7 +60,7 @@ export default {
     chromaKeep: 0.85, // haze keeps this much chroma (passes through mauve, not grey)
     shadowHue: '#5b5fae', // violet-blue fill in shadows
     shadowFill: 0.35, // how strongly shadows take the hue (0..1)
-    castShadowLift: 1.4, // reflected light lifting cast shadows on sunward faces
+    castShadowLift: 0.9, // cool sky + reflected light filling cast shadows on sunward faces
     distanceHue: '#7e82b6', // cool blue-violet that distance shifts toward
     glowHue: '#ffc27a', // warm haze toward the Sun
     sunWarmth: '#fff6e8', // multiplies direct sunlight (slightly warm)
@@ -190,7 +190,9 @@ export default {
     },
     heroVariant: 0,
     // Composition trees at the bookmarks [x, z, yaw, scale, variant].
-    hero: [[42.05, -33.94, 0.6, 1.0, 0], [-22.0, 76.7, 2.1, 1.05, 0], [-36.3, 16.8, 4.0, 0.95, 0]],
+    hero: [[42.05, -33.94, 0.6, 1.0, 0], [-22.0, 76.7, 2.1, 1.05, 0], [-36.3, 16.8, 4.0, 0.95, 0],
+      // Big trees sunward of the path and clearing views: their crowns shade the foreground.
+      [22, -28, 1.3, 1.25, 3], [10, -31, 2.6, 1.2, 1], [-94, 38, 0.4, 1.3, 1], [-86, 49, 3.7, 1.2, 3]],
     variants: [
       { ...DECIDUOUS, name: 'maple-orange', seed: 11, weight: 0.24, neighbour: 4,
         palette: { lit: '#e09a2a', mid: '#b8661e', interior: '#5a3c1c', glow: '#e4a419' } },

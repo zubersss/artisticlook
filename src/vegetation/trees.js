@@ -218,13 +218,13 @@ const TRUNK_FRAG = /* glsl */ `
           // Shade side: cool mauve reflected light and warm chroma (never neutral black).
           // Warm light bounced from the sunlit ground keeps backlit trunks umber, not black.
           float shadeSide = saturate(0.3 - dot(N, uSunDir));
-          col += alb * (uSkyHorizon * 0.12 + uGroundBounce * 0.9) * shadeSide * painterK();
+          col += alb * (uSkyHorizon * 0.05 + uGroundBounce * 0.35) * shadeSide * painterK();
           if (uViewMode > 0.5) {
             col = chromaScale(col, 1.0 + 0.35 * shadeSide);
             // Never neutral black: floor at a warm umber ~25 % of the sunlit bark value.
             float L = luma(col), litL = luma(uBarkLit * uSunColor) * 0.6;
             vec3 umber = vec3(0.034, 0.02, 0.01) / 0.0215;
-            col = mix(col, umber * litL * 0.25, 1.0 - smoothstep(0.0, litL * 0.25, L));
+            col = mix(col, umber * litL * 0.12, 1.0 - smoothstep(0.0, litL * 0.12, L));
           }
           // Gold rim when backlit, broken into strokes on the Sun side.
           float rim = pow(1.0 - saturate(abs(dot(N, V))), 4.0) * pow(saturate(dot(-V, uSunDir)), 2.0) * (vBark.w < 0.5 ? 1.0 : 0.15);
