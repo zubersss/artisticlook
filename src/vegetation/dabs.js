@@ -28,11 +28,11 @@ export function generateDabAtlas(N = 512, opt = {}) {
     for (let cx = 0; cx < 4; cx++) {
       const near = cy < 2;
       const ox = cx * C, oy = cy * C;
-      const count = near ? 8 + rng.int(5) : 4 + rng.int(3);
+      const count = near ? 10 + rng.int(6) : 4 + rng.int(3);
       const dabs = [];
       // Place dabs inside a disc (the card is an octagon around it), avoid heavy overlap.
       for (let k = 0; k < count; k++) {
-        const r = near ? rng.range(0.11, 0.165) : rng.range(0.2, 0.3); // dab radius as fraction of cell
+        const r = near ? rng.range(0.085, 0.125) : rng.range(0.2, 0.3); // dab radius as fraction of cell
         let px = 0.5, py = 0.5, tries = 0;
         do {
           const a = rng.next() * Math.PI * 2, d = Math.sqrt(rng.next()) * (0.5 - r - 0.03);
@@ -41,7 +41,7 @@ export function generateDabAtlas(N = 512, opt = {}) {
         } while (tries < 40 && dabs.some((q) => Math.hypot(q.x - px, q.y - py) < (q.r + r) * (near ? 1.0 : 0.8)));
         dabs.push({
           x: px, y: py, r, id: rng.next(), ang: rng.next() * Math.PI,
-          star: near && rng.next() < 0.3, lobes: 3 + rng.int(3),
+          star: near && rng.next() < 0.12, lobes: 3 + rng.int(3),
           sub: Array.from({ length: 2 + rng.int(2) }, () => ({ dx: rng.range(-0.35, 0.35), dy: rng.range(-0.35, 0.35), s: rng.range(0.55, 0.9), a: rng.next() * Math.PI })),
           seed: rng.int(1e6),
         });
@@ -82,7 +82,7 @@ export function generateDabAtlas(N = 512, opt = {}) {
           ID[k] = bestDab ? bestDab.id : 0;
           E[k] = Math.max(0, Math.min(1, best * 1.6));
           // Paint height: dome + bristle streaks along the dab.
-          const hb = bestDab ? 0.75 + 0.25 * n1((u * Math.cos(bestDab.ang) + v * Math.sin(bestDab.ang)) * 60, bestDab.seed + 7) : 0;
+          const hb = bestDab ? 0.92 + 0.08 * n1((u * Math.cos(bestDab.ang) + v * Math.sin(bestDab.ang)) * 30, bestDab.seed + 7) : 0;
           H[k] = Math.max(0, Math.min(1, Math.sqrt(Math.max(0, best)) * hb));
         }
       }

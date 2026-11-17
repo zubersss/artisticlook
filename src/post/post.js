@@ -107,8 +107,9 @@ uniform sampler2D tQuarter; // 1/4 prefilter (rgb colour, a shaft source)
 uniform vec4 uQuarter;
 uniform vec2 uSunUv;
 uniform vec3 uShaftColor;
-uniform vec4 uMix; // x bloom strength, y shaft strength, z bloom tint mix
+uniform vec4 uMix; // x bloom strength, y shaft strength, z bloom tint mix, w knee (exposed units)
 uniform vec3 uBloomTint;
+uniform sampler2D tExpoNow;
 vec3 t(vec2 uv) { return decodeHDR(texture(tSrc, clamp(uv, uSrc.zw * 0.5, uSrc.xy - uSrc.zw * 0.5)).rgb); }
 #define SHAFT_TAPS 24
 void main() {
@@ -118,6 +119,12 @@ void main() {
   vec3 fine = decodeHDR(texture(tQuarter, vUv * uQuarter.xy).rgb);
   // Weight the coarse levels most: soft glow rather than a sharp halo.
   vec3 bloom = (fine * 0.25 + coarse * 0.75);
+  // Soft threshold in exposed units: only genuinely bright light glows, so dark
+  // forms in front of the Sun stay dark silhouettes (veil <= ~+0.1 display value).
+  float E = exp2(textureLod(tExpoNow, vec2(0.5), 0.0).r);
+  float xb = luma(bloom) * E;
+  float yb = xb * xb / (xb + uMix.w) - uMix.w * 0.25;
+  bloom *= max(yb, 0.0) / max(xb, 1e-5);
   bloom *= mix(vec3(1.0), uBloomTint, uMix.z);
   vec3 outc = bloom * uMix.x;
   if (uMix.y > 0.0) {
@@ -256,7 +263,7 @@ void main() {
 
   // Bloom and shafts arrive pre-scaled in one quarter-res texture.
   vec3 bs = texture(tBloom, uv * uBloomSrc.xy).rgb;
-  c = c * (1.0 - uBloom.x) + bs;
+  c += bs; // thresholded glow is purely additive
 
   c *= vExpo;
 
@@ -346,7 +353,7 @@ export class Post {
     this.mUp.blendSrc = THREE.OneFactor;
     this.mUp.blendDst = THREE.OneFactor;
     if (caps.bloom.encode) this.mUp.blending = THREE.NoBlending; // encoded targets cannot be summed
-    this.mUpShafts = fsMaterial('post.upshafts', UPSHAFTS, { tSrc: { value: null }, uSrc: v4(), tQuarter: { value: null }, uQuarter: v4(), uSunUv: v2(), uShaftColor: v3(1, 0.8, 0.5), uMix: v4(), uBloomTint: v3(1, 0.9, 0.75) });
+    this.mUpShafts = fsMaterial('post.upshafts', UPSHAFTS, { tSrc: { value: null }, uSrc: v4(), tQuarter: { value: null }, uQuarter: v4(), uSunUv: v2(), uShaftColor: v3(1, 0.8, 0.5), uMix: v4(), uBloomTint: v3(1, 0.9, 0.75), tExpoNow: { value: null } });
     this.mExposure = fsMaterial('post.exposure', EXPOSURE, { tSrc: { value: null }, uSrc: v4(), tPrev: { value: null }, uExpo: v4(), uExpoFixed: { value: 0 }, uPrevAvg: { value: 0 } });
     this.mFinal = fsMaterial('post.final', FINAL, {
       ...sceneU(), tBloom: { value: null }, tExposure: { value: null }, tCanvas: { value: null },
@@ -505,7 +512,8 @@ export class Post {
     us.uSunUv.value.copy(sunUv);
     us.uShaftColor.value.set(p.shaftColor[0], p.shaftColor[1], p.shaftColor[2]);
     us.uBloomTint.value.set(p.bloomTint[0], p.bloomTint[1], p.bloomTint[2]);
-    us.uMix.value.set(f.viewMode > 0.5 ? p.bloomStrength : p.bloomStrength * 0.5, shaftOn ? p.shaftStrength * sunVisible : 0, f.viewMode > 0.5 ? 1 : 0, 0);
+    us.uMix.value.set(f.viewMode > 0.5 ? p.bloomStrength : p.bloomStrength * 0.5, shaftOn ? p.shaftStrength * sunVisible : 0, f.viewMode > 0.5 ? 1 : 0, p.bloomKnee ?? 0.6);
+    us.tExpoNow.value = next.texture;
     this._pass(this.mUpShafts, this.bOut);
 
     // 6. final

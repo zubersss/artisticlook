@@ -70,7 +70,7 @@ export default {
     exposureKey: 0.17, exposureMin: -8, exposureMax: 8, exposureTau: 2.0, exposureBias: 0.0, exposureFallback: -1.5,
     // Lottes 2016 curve on the max channel: T(mid) = midOut, T(white) = 1.
     curveA: 1.38, curveD: 0.96, curveMid: 0.18, curveMidOut: 0.21, curveWhite: 10,
-    bloomStrength: 0.08, bloomTint: [1.0, 0.9, 0.75], shaftStrength: 0.5, shaftColor: [1.0, 0.8, 0.5],
+    bloomStrength: 0.09, bloomKnee: 0.7, bloomTint: [1.0, 0.9, 0.75], shaftStrength: 0.5, shaftColor: [1.0, 0.8, 0.5],
     sharpen: 0.35, warpPx: 2.5,
     saturation: 1.1, blackLift: 0.012, liftColor: [1.0, 0.92, 0.82], vignette: 0.26, canvas: 0.045,
     shadowCool: 0.2, highlightWarm: 0.08, warmTint: [1.06, 1.0, 0.9], contrast: 1.1,
@@ -156,12 +156,12 @@ export default {
     variants: [
       {
         name: 'maple-orange', form: 'deciduous', seed: 11, neighbour: 4,
-        height: [16, 19], baseRadius: [0.42, 0.5], forkAt: [0.18, 0.22], leanDeg: 5, limbWobble: 0.5,
-        limbs: [5, 6], limbStart: 0.3, limbTilt: [44, 66], limbLength: [0.4, 0.52], clusterR: [2.1, 3.0], crown: 3,
-        nearCards: 250, cardSize: [1.0, 1.4], cells: [0, 1, 2, 3, 4, 5, 6, 7],
+        height: [16, 19], baseRadius: [0.42, 0.5], forkAt: [0.32, 0.4], leanDeg: 5, limbWobble: 0.5,
+        limbs: [4, 5], limbStart: 0.45, limbTilt: [40, 62], limbLength: [0.36, 0.48], clusterR: [2.1, 3.0], crown: 3,
+        nearCards: 250, cardSize: [0.95, 1.3], cells: [0, 1, 2, 3, 4, 5, 6, 7],
         midCards: 70, midCardSize: [2.4, 3.2], midCells: [8, 9, 10, 11, 12, 13, 14, 15],
-        palette: { lit: '#eea52a', mid: '#b8661e', interior: '#5a3c1c', glow: '#f6c23e' },
-        bark: { base: '#b08a54', dark: '#5c4a40' }, glow: 2.4,
+        palette: { lit: '#e09a2a', mid: '#b8661e', interior: '#5a3c1c', glow: '#e4a419' },
+        bark: { base: '#a8774a', dark: '#6d5a5e' }, glow: 2.2,
       },
       { name: 'beech-gold', form: 'deciduous', seed: 23, palette: { lit: '#f0cc40', mid: '#d09a22', interior: '#6e4a14', glow: '#f6dc50' } },
       { name: 'red-maple', form: 'deciduous', seed: 37, palette: { lit: '#e0582a', mid: '#b0301e', interior: '#561812', glow: '#f07a2c' } },

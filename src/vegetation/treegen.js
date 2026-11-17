@@ -66,8 +66,8 @@ function addTwigs(out, c, len, r, rng) {
   for (let i = 0; i < n; i++) {
     const a = rng.next() * Math.PI * 2, e = rng.range(-0.3, 0.8);
     const d = new THREE.Vector3(Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e));
-    const pts = branchPoints(c.clone().addScaledVector(d, -0.3), d, len * rng.range(0.7, 1.2), 2, 0.2, rng, 0.6);
-    addTube(out, pts, pts.map((_, j) => Math.max(0.015, r) * (1 - 0.7 * j / (pts.length - 1))), 3, 3, 0);
+    const pts = branchPoints(c.clone().addScaledVector(d, -0.4), d, len * rng.range(0.5, 0.8), 3, 0.25, rng, 0.7);
+    addTube(out, pts, pts.map((_, j) => Math.max(0.035, r) * (1 - 0.6 * j / (pts.length - 1))), 3, 3, 0);
   }
 }
 

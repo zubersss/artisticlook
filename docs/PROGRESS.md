@@ -171,6 +171,23 @@ weighted, hue #F6C23E; palette lit #EEA52A / mid #B8661E / interior umber #5A3C1
 boost cut to 0.15; bark ochre #B08A54 / umber #5C4A40 with per-stroke value ±25 %, warm shade-side
 chroma, rim broken into strokes on the Sun side, moss on the shaded flank, limb tops and crotches.
 
+### Stage 4 (hero tree), round 2
+Gaps: (1) backlit crown flat mustard, gold glow not placed near the Sun; side-lit shade crimson;
+(2) dabs read as fuzzy pom-poms (rosettes, dark cores, feathered rims), too big (6–10 % H up close),
+too few holes; (3) branches still a broom from one height, stake ends, pick-up-stick twigs, floating
+clusters; (4) trunk khaki and flat, moss wrapped all round, short chips; (5) limbs in front of the Sun
+turn into pale ghosts with a veil up the trunk.
+Changes: backlight split into (a) a wide-lobe warm orange transmission of the leaf body and (b) gold
+(#E4A419) only on thin outer-shell dabs within ~25° of the Sun; foliage shade pulled 55 % toward
+umber (violet fill no longer turns orange crimson); one flat colour per dab (no dab relief, no edge
+term), dab radius 0.085–0.125 of the cell with 10–15 dabs per card, fewer rosettes; trunk now runs
+to 32–40 % of height with limbs leaving between 45 % and 100 % of it; twigs start inside clusters,
+are thicker (≥ 3.5 cm) and end in leaves; bark tiles 2.4 m with 2.5× vertical stretch (long
+strokes), ochre #A8774A / mauve #6D5A5E; moss only on the north flank in patches and in crotches; rim
+light only at true silhouettes (limbs 15 %); the trunk shade fill that made the veil cut to a
+quarter; bloom gets an exposure-aware soft threshold (knee 0.7 exposed) and is additive, so dark
+forms in front of the Sun stay dark.
+
 ## Phone results
 (pasted benchmark results from the owner's S23 Ultra, and the governor changes made)
 
