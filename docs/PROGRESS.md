@@ -8,8 +8,8 @@ judging the look only; performance numbers come only from the owner's phone.
 | # | Stage | Checks | Status |
 |---|---|---|---|
 | 1 | Skeleton: renderer, camera-relative world, HDR target + bloom/shafts/exposure + final pass, governor, HUD, touch/desktop input, bookmarks, basic benchmark, Pages workflow, screenshot/stability/overdraw script | builds; runs headless with no console errors; screenshot script saves every bookmark; workflow present | **done** — placeholder ground/sky through the full HDR chain; tap-to-start, touch look/stick, HUD, benchmark start/stop/report verified headless |
-| 2 | Terrain (clipmap, recipe heightfield, path/stream/clearings carving), far hills & ridges, CPU atmosphere LUT sky, aerial perspective + height fog, painter's light | screenshots of all bookmarks; critic rounds (≤ 3) | |
-| 3 | Brushwork on ground and rocks: stroke texture, hex-tiled world-space strokes, 2 octaves, broken colour, flecks, sheen, brushed shadow edges; boulders | critic rounds; stability test | |
+| 2 | Terrain (clipmap, recipe heightfield, path/stream/clearings carving), far hills & ridges, CPU atmosphere LUT sky, aerial perspective + height fog, painter's light | screenshots of all bookmarks; critic rounds (≤ 3) | **done** — 3 critic rounds (log below); CDLOD terrain, CPU atmosphere LUT, painted sky, aerial + ground haze, painter's light, far canopy crowns |
+| 3 | Brushwork on ground and rocks: stroke texture, hex-tiled world-space strokes, 2 octaves, broken colour, flecks, sheen, brushed shadow edges; boulders | critic rounds; stability test | in progress — stroke texture, hex-lattice world strokes, flow field, broken colour, flecks, sheen, boulders in place |
 | 4 | One hero tree: trunk/limbs/bark strokes, leaf-dab atlas (coverage-preserving mips), canopy clusters, backlit glow; tuned against references | critic rounds; stability; **phone checkpoint 1** | |
 | 5 | Forest: density map placement (1,500–2,500), 6 deciduous + 2 conifer variants, instancing per variant per LOD, near/mid LOD fades, far painted canopy on terrain | critic; stability; overdraw < 2.5 | |
 | 6 | Shadows: two cascades (120 m / 900 m), staggered updates, soft + brushed filtering, dappled light | critic; stability; **phone checkpoint 2** | |
@@ -50,6 +50,57 @@ judging the look only; performance numbers come only from the owner's phone.
 
 ## Critic log
 (per stage, per round: the five gaps returned, what was changed)
+
+### Stage 2, round 1
+Gaps (ranked): (1) sky too dark/navy (#3B5180), heavier than the land — must be the lightest mass;
+(2) values compressed (1st pct 0.21–0.29, 99th 0.51–0.69), no light/shade families, flat mustard
+ground; (3) Sun a white dot in a grey veil — no warm halo; (4) distance a thin pale jagged wall,
+lighter than the sky, no middle planes, mid canopy magenta; (5) aerial canopy reads as camouflage
+(magenta darks, red outlines, teal blotches, grey path).
+Changes: painter's sky = LUT luminance compressed (exp 0.42) and lifted ×2.1, hues pulled 65 %
+toward a painted palette (zenith #7B8EC7, horizon #BCCBE0, cream band, warm halo #EAD8B8 out to
+~35°); Sun disc painted cream at a fixed pre-curve value using the current exposure (read per
+vertex); exposure metering weights the lower half; ground haze capped (optical depth ≤ 1.1) and
+handed over to the aerial colour beyond 0.6–3 km; warmer haze hue; aerial extinction 8e-5/m with a
+900 m scale height (misty bases); layered rounded far hills (1.4 km, 3.1 km, 5.2 km wavelengths);
+far canopy rebuilt as lit crowns on a jittered 8 m lattice with species clumps (contiguous palette
+runs, greens as separate clumps), umber gaps, detail fading 0.5–1.5 km; path stays visible at
+distance; brighter grass; tone curve a=1.38, contrast 1.1.
+
+### Stage 2, round 2
+Gaps: (1) sky still a saturated "skybox" blue (zenith #4C69B5) with little top-to-bottom value
+change; (2) ground dim mustard at near-max chroma, shaded litter blood-red, path s0.86 with red
+blotches; (3) the Sun halo a vertical pillar with grey edges; (4) ridges one flat lavender strip as
+light as the sky, glowing white behind the Sun, no planes; (5) aerial canopy "flat sequins", too
+red/saturated, gaps too dark, no distance shift, clearings not the lightest masses.
+Changes: sky luminance now comes from the painted palette (zenith ≈ half the horizon's luminance)
+scaled to a CPU reference from the LUT; round halo with a smooth Mie-like falloff walking cream →
+peach → blue in Oklab (no grey); no mid-tone vibrance on sky pixels; aerial inscatter 18 % darker
+than the sky behind it and the separate Mie glow nearly removed (the painted halo carries it);
+new generic `range` terrain primitive → concentric hill ranges at 2.3, 4.6 and 8.5 km (receding
+planes); sunlight chroma reduced to 62 % (slightly warm, not orange); terminator/shadow chroma
+boosts halved; less red litter and path flecks; crowns lobed, domed, with saturated dark shade
+sides and a gold sunward fringe; palette shifted to gold with red as an accent; lighter umber-olive
+gaps; exposure key 0.21; post saturation 1.1.
+
+### Stage 2, round 3 (final)
+Gaps: (1) value key too high, shadows lifted to lilac-grey (lit:shadow ≈ 2.3:1, darkest 1 % at
+0.29–0.46); (2) halo a flat cream plateau running to the top edge, grey seam into the blue, no sky
+brushwork (σ 0.003); (3) middle distance a milky salmon haze hiding the crowns; (4) ridges a pale
+pink band with a violet crest line, as light as the sky; (5) aerial canopy a uniform carpet of
+tiles, no groves.
+Changes: exposure key 0.15 and metering less bottom-weighted (contre-jour reads); the painter's fill
+is half desaturated toward a warm neutral and 20 % weaker, anti-solar fill halved, shadow-hue fill
+0.2; halo smaller and steep (fades by ~28°), hue walk blue → muted lilac → peach → cream with chroma
+held in Oklab, gold haze low under the Sun; sky strokes now use the stroke texture in
+view-direction space (±16 %); aerial inscatter 0.58 × the painted sky, ground haze no longer lifted
+by the sky lift, capped at optical depth 0.6; altitude-based ridge tint (the crest outline) removed,
+land beyond 4 km painted as a mauve mass and pushed to blue-violet by a second distance-hue stage
+(3–9 km); taller ranges at 2.3/4.6/8.5 km; forest density patchier (groves and meadows), crowns
+exist only where density allows, sizes vary 0.4–0.82 of the lattice, brighter gold sunward fringe;
+greener grass albedo.
+Left for later stages (needs trees/shadows): contre-jour darks near the camera, crown shadows on
+neighbours, value structure of forest views.
 
 ## Phone results
 (pasted benchmark results from the owner's S23 Ultra, and the governor changes made)

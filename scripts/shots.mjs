@@ -6,7 +6,7 @@
 //   node scripts/shots.mjs --views=2 --bookmarks=path  # subset
 //   node scripts/shots.mjs --stability                 # 3 consecutive moving frames per bookmark
 //   node scripts/shots.mjs --overdraw                  # print overdraw per bookmark
-//   options: --world=earth-forest --out=dir --scale=1 --res=1600 --time=0 --nobuild --quick
+//   options: --world=earth-forest --out=dir --scale=1 --res=1600 --time=0 --hide=trees,rocks --nobuild
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -67,7 +67,7 @@ async function main() {
   await mkdir(out, { recursive: true });
 
   for (const world of worlds) {
-    const url = `http://127.0.0.1:${port}/?shot=1&world=${world}&res=${res}&time=${args.time || 0}`;
+    const url = `http://127.0.0.1:${port}/?shot=1&world=${world}&res=${res}&time=${args.time || 0}${args.hide ? `&hide=${args.hide}` : ''}`;
     await page.goto(url);
     await page.waitForFunction(() => (window.__app && window.__app.ready) || /^Sorry/.test(document.getElementById('loading-text')?.textContent || ''), null, { timeout: 900000, polling: 500 });
     const failed = await page.evaluate(() => !(window.__app && window.__app.ready) && document.getElementById('loading-text').textContent);
@@ -79,7 +79,7 @@ async function main() {
       if (args.overdraw) {
         const od = await page.evaluate((b) => { window.__app.setBookmark(b); window.__app.setView(2); window.__app.renderFrames(2); return window.__app.overdraw(); }, b);
         const st = await page.evaluate(() => window.__app.stats());
-        console.log(`  overdraw ${b}: ${od.toFixed(2)}  (calls ${st.calls}, tris ${st.tris})`);
+        console.log(`  overdraw ${b}: shaded ${od.shaded.toFixed(2)}, all rasterized ${od.all.toFixed(2)}  (calls ${st.calls}, tris ${st.tris})`);
         continue;
       }
       if (args.stability) {

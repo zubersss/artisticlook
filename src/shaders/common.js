@@ -23,6 +23,21 @@ export const G = {
   uStroke: { value: null }, // RGBA brush-stroke texture (height, normal xy, id)
   uResolution: { value: new THREE.Vector2(1600, 744) },
   uOverdraw: { value: 0 },
+  // Painter's light / painted distance (set from the world file by the sky module).
+  uSunWarm: { value: new THREE.Vector3(1, 1, 1) },
+  uAtmo: { value: new THREE.Vector4(1.2e-5, 1500, 0.5, 0.85) },
+  uAtmo2: { value: new THREE.Vector4(0.035, 0.72, 0, 0) },
+  uHazeColor: { value: new THREE.Vector3(0.25, 0.21, 0.19) },
+  uCamAGL: { value: 1.7 }, // camera height above the ground (m)
+  uSkyPaint: { value: new THREE.Vector4(0.08, 0.62, 2.0, 0.65) }, // strokes, compress, lift, hue blend
+  uSkyHues: { value: [new THREE.Vector3(0.2, 0.27, 0.57), new THREE.Vector3(0.5, 0.6, 0.75), new THREE.Vector3(0.82, 0.69, 0.48), new THREE.Vector3(0.8, 0.72, 0.6)] },
+  uSkyHalo: { value: 0.82 },
+  uSkyRef: { value: 1.0 }, // painted sky reference luminance (horizon), from the LUT on the CPU
+  uSkyPeach: { value: new THREE.Vector3(0.75, 0.55, 0.45) },
+  uSunChroma: { value: 1.0 },
+  // Brushwork: x tile factor (tile ~= x * distance), y stroke texture size, z weight sharpness, w octave fade width.
+  uBrush: { value: new THREE.Vector4(0.21, 512, 6, 0.35) },
+  uBrushCam: { value: new THREE.Vector4() }, // fine (xy) and 128 m-coarse (zw) camera offsets
 };
 
 export const GLOBAL_DEFINES = {};
@@ -129,13 +144,14 @@ layout(location = 0) out highp vec4 fragColor;
  */
 export function makeMaterial(o) {
   const chunks = (o.chunks || []).join('\n');
+  const fchunks = (o.fragChunks || []).join('\n'); // fragment-only (derivatives etc.)
   const mat = new THREE.ShaderMaterial({
     name: o.name || 'engine',
     glslVersion: THREE.GLSL3,
     uniforms: Object.assign({}, G, o.uniforms || {}),
     defines: Object.assign({}, GLOBAL_DEFINES, o.defines || {}),
     vertexShader: VERT_HEAD + GLSL_COMMON + chunks + o.vertex,
-    fragmentShader: FRAG_HEAD + GLSL_COMMON + chunks + o.fragment,
+    fragmentShader: FRAG_HEAD + GLSL_COMMON + chunks + fchunks + o.fragment,
     side: o.side ?? THREE.FrontSide,
     depthWrite: o.depthWrite ?? true,
     depthTest: o.depthTest ?? true,

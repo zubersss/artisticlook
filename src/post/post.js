@@ -148,7 +148,7 @@ void main() {
   // each sample at 4x that so a bright sky cannot darken a backlit forest view.
   for (int y = 0; y < 6; y++) for (int x = 0; x < 9; x++) {
     vec2 uv = (vec2(float(x), float(y)) + 0.5) / vec2(9.0, 6.0);
-    float w = 1.0 - 0.55 * length((uv - 0.5) * vec2(1.0, 1.3));
+    float w = (1.0 - 0.55 * length((uv - 0.5) * vec2(1.0, 1.3))) * (uv.y < 0.55 ? 1.25 : 0.8);
     float L = luma(decodeHDR(texture(tSrc, uv * uSrc.xy).rgb));
     s += log2(max(L, 1e-4)) * w; ws += w;
   }
@@ -158,7 +158,7 @@ void main() {
   s = 0.0;
   for (int y = 0; y < 6; y++) for (int x = 0; x < 9; x++) {
     vec2 uv = (vec2(float(x), float(y)) + 0.5) / vec2(9.0, 6.0);
-    float w = 1.0 - 0.55 * length((uv - 0.5) * vec2(1.0, 1.3));
+    float w = (1.0 - 0.55 * length((uv - 0.5) * vec2(1.0, 1.3))) * (uv.y < 0.55 ? 1.25 : 0.8);
     float L = luma(decodeHDR(texture(tSrc, uv * uSrc.xy).rgb));
     s += min(log2(max(L, 1e-4)), cl) * w;
   }
@@ -278,8 +278,9 @@ void main() {
     if (o.r >= o.g && o.g >= o.b) o.g += (o.r - o.g) * 0.25 * smoothstep(0.55, 0.95, m3);
     // Mid-tone vibrance (keeps chroma rich where the eye looks).
     float L = luma(o);
-    o = max(vec3(0.0), L + (o - L) * (1.0 + (uGrade.x - 1.0) * 4.0 * L * (1.0 - L)));
-    o = clamp(mix(vec3(L), o, 1.0) , 0.0, 1.0);
+    float vib = sceneDistAt(suv, c0) < 20000.0 ? 1.0 : 0.25; // the sky stays muted
+    o = max(vec3(0.0), L + (o - L) * (1.0 + (uGrade.x - 1.0) * 4.0 * L * (1.0 - L) * vib));
+    o = clamp(o, 0.0, 1.0);
     o = clamp(mix(vec3(0.5), o, uGrade2.z), 0.0, 1.0);
     // Warm, lifted black floor.
     o = o * (1.0 - uGrade.y) + uLiftColor * uGrade.y;

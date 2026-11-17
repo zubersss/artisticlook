@@ -10,7 +10,7 @@ const saved = new Map();
  * material in count mode (each shaded fragment adds 1/255), then read it back.
  * Debug only: readPixels stalls the pipeline.
  */
-export function measureOverdraw(engine, readback = true) {
+export function measureOverdraw(engine, readback = true, includePrepass = false) {
   const r = engine.renderer;
   const rt = engine.post.ensureCountTarget();
   const w = rt.width, h = rt.height;
@@ -23,7 +23,9 @@ export function measureOverdraw(engine, readback = true) {
     m.blendEquation = THREE.AddEquation;
     m.blendSrc = THREE.OneFactor; m.blendDst = THREE.OneFactor;
     m.alphaToCoverage = false;
-    m.colorWrite = true;
+    // 'Shaded' overdraw counts colour-pass fragments; the foliage depth prepass is
+    // counted only when includePrepass (all rasterized fragments).
+    m.colorWrite = includePrepass || !m.userData.prepass;
   });
   G.uOverdraw.value = 1;
   r.setRenderTarget(rt);
@@ -66,7 +68,7 @@ export function installDebugApi(engine, loop) {
       c.yaw += yawDeg * Math.PI / 180;
       engine.renderFrame(dt, dt * 1000);
     },
-    overdraw: () => measureOverdraw(engine, true),
+    overdraw: () => ({ shaded: measureOverdraw(engine, true, false), all: measureOverdraw(engine, true, true) }),
     stats: () => engine.stats,
     pose: () => ({ pos: Array.from(engine.controller.pos), yaw: engine.controller.yaw * 180 / Math.PI, pitch: engine.controller.pitch * 180 / Math.PI }),
     setPose: (x, y, z, yaw, pitch, mode) => engine.controller.setPose(x, y, z, yaw, pitch, mode),

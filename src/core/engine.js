@@ -13,7 +13,12 @@ import { Input } from '../input/input.js';
 import { Controller } from '../input/controller.js';
 import { Benchmark } from '../bench/benchmark.js';
 import { computeSky, daysSinceJ2000 } from '../sky/astronomy.js';
-import { buildPlaceholder } from '../debug/placeholder.js';
+import { Heightfield } from '../terrain/heightfield.js';
+import { Terrain } from '../terrain/terrain.js';
+import { Sky } from '../sky/sky.js';
+import { Rocks } from '../terrain/rocks.js';
+import { Trees } from '../vegetation/trees.js';
+import { generateStrokeTexture } from '../brushwork/strokes.js';
 import { measureOverdraw } from '../debug/debug.js';
 
 const VIEW_NAMES = ['raw', "painter's", 'painted'];
@@ -96,7 +101,31 @@ export class Engine {
   }
 
   async buildContent(progress) {
-    return buildPlaceholder(this);
+    const W = this.world;
+    const hf = new Heightfield(W.terrain);
+    await hf.build((f) => progress('Shaping the land', 0.2 + 0.35 * f));
+    this.heightfield = hf;
+    progress('Loading the brushes', 0.56);
+    await new Promise((r) => setTimeout(r, 0));
+    const strokes = generateStrokeTexture(W.brush?.textureSize ?? 512, { seed: W.brush?.seed ?? 1234 });
+    strokes.tex.anisotropy = Math.min(W.brush?.anisotropy ?? 4, this.caps.anisotropy);
+    G.uStroke.value = strokes.tex;
+    G.uBrush.value.set(W.brush?.tileFactor ?? 0.21, strokes.size, W.brush?.sharpness ?? 6, W.brush?.octaveFade ?? 0.35);
+    progress('Mixing the sky', 0.6);
+    this.sky = new Sky(this);
+    this.sky.precompute(W.timeOfDay.map((t) => computeSky(W.astronomy, daysSinceJ2000(t.utc))));
+    this.modules.push(this.sky);
+    progress('Laying the ground', 0.64);
+    this.terrain = new Terrain(this, hf);
+    this.modules.push(this.terrain);
+    if (W.rocks && W.rocks.count > 0 && !config.hide.has('rocks')) this.rocks = new Rocks(this, hf);
+    if (W.vegetation && W.vegetation.variants?.length && !config.hide.has('trees')) {
+      progress('Growing trees', 0.66);
+      await new Promise((r) => setTimeout(r, 0));
+      this.trees = new Trees(this, hf);
+      this.modules.push(this.trees);
+    }
+    return { heightAt: (x, z) => hf.heightAt(x, z) };
   }
 
   /** Compile every program behind the loading screen, then warm up each bookmark. */
@@ -270,8 +299,13 @@ export class Engine {
     }
     this.frame.setCamera(c.pos[0], c.pos[1], c.pos[2]);
     c.apply(this.camera);
-    G.uCamWrapped.value.set(this.frame.camWrapped[0], this.frame.camWrapped[1], this.frame.camWrapped[2]);
+    const cw = this.frame.camWrapped;
+    G.uCamWrapped.value.set(cw[0], cw[1], cw[2]);
+    // Brush lattice origin: coarse part a multiple of 128 m (exact), fine part small.
+    const cx = Math.round(cw[0] / 128) * 128, cz = Math.round(cw[2] / 128) * 128;
+    G.uBrushCam.value.set(cw[0] - cx, cw[2] - cz, cx, cz);
     G.uCamAlt.value = c.pos[1];
+    G.uCamAGL.value = c.pos[1] - this.heightAt(c.pos[0], c.pos[2]);
     const ctx = { dt, time: this.time, camera: this.camera, frame: this.frame, engine: this };
     for (let i = 0; i < this.modules.length; i++) this.modules[i].update?.(ctx);
     this.frame.update();

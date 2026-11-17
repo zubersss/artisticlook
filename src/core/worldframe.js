@@ -6,16 +6,16 @@ import { ENGINE } from './config.js';
 export class WorldFrame {
   constructor() {
     this.cam = new Float64Array(3);
-    this.camWrapped = new Float64Array(3); // cam mod ENGINE.wrapPeriod, in [0, period)
+    this.camWrapped = new Float64Array(3); // cam - period * round(cam / period): centred, in [-p/2, p/2)
     this.anchors = [];
   }
 
   setCamera(x, y, z) {
     this.cam[0] = x; this.cam[1] = y; this.cam[2] = z;
     const p = ENGINE.wrapPeriod;
-    this.camWrapped[0] = x - Math.floor(x / p) * p;
-    this.camWrapped[1] = y - Math.floor(y / p) * p;
-    this.camWrapped[2] = z - Math.floor(z / p) * p;
+    this.camWrapped[0] = x - Math.round(x / p) * p;
+    this.camWrapped[1] = y - Math.round(y / p) * p;
+    this.camWrapped[2] = z - Math.round(z / p) * p;
   }
 
   /** Keep `object3D` at world position (x, y, z). Returns the anchor record (mutable). */

@@ -18,6 +18,7 @@ export const config = {
   overdraw: bool('overdraw', false),
   quality: q.get('quality') || 'auto', // auto | max | min
   debug: q.get('debug') || '',
+  hide: new Set((q.get('hide') || '').split(',').filter(Boolean)), // e.g. hide=trees,rocks (staged screenshots)
 };
 
 export const ENGINE = {
@@ -28,7 +29,7 @@ export const ENGINE = {
   near: 0.25,
   far: 40000,
   vfovDeg: 55,
-  // World-anchored textures repeat with periods that divide this; the camera
-  // position modulo this period is passed to shaders (keeps floats small).
-  wrapPeriod: 4096,
+  // World-anchored patterns must repeat with power-of-two periods (m) that divide
+  // this; the camera position wrapped (centred) to this period is passed to shaders.
+  wrapPeriod: 65536,
 };
