@@ -8,7 +8,7 @@ import { detectCapabilities } from './capabilities.js';
 import { makeNoiseTexture, makeCanvasTexture } from './textures.js';
 import { G, setGlobalDefine } from '../shaders/common.js';
 import { Post } from '../post/post.js';
-import { Governor } from '../governor/governor.js';
+import { Governor, pixelSteps, MIN_PIXELS } from '../governor/governor.js';
 import { Input } from '../input/input.js';
 import { Controller } from '../input/controller.js';
 import { Benchmark } from '../bench/benchmark.js';
@@ -18,6 +18,7 @@ import { Terrain } from '../terrain/terrain.js';
 import { Sky } from '../sky/sky.js';
 import { Rocks } from '../terrain/rocks.js';
 import { Trees } from '../vegetation/trees.js';
+import { Shadows } from '../shadows/shadows.js';
 import { generateStrokeTexture } from '../brushwork/strokes.js';
 import { measureOverdraw } from '../debug/debug.js';
 
@@ -75,7 +76,7 @@ export class Engine {
     this.heightAt = content.heightAt;
 
     const W = this.world;
-    this.governor = new Governor({ targetFps: config.fps, startRes: ENGINE.startLongSide, mode: config.quality === 'auto' ? 'auto' : config.quality, fixedRes: config.res });
+    this.governor = new Governor({ targetFps: config.fps < 50 ? 30 : 60, sharp: config.fps < 50, mode: config.quality === 'auto' ? 'auto' : config.quality, fixedRes: config.res });
     if (config.shot) this.governor.mode = 'fixed';
     this.controller = new Controller(this.heightAt, {
       bounds: W.terrain ? { minX: -W.terrain.patchSize / 2 + 5, maxX: W.terrain.patchSize / 2 - 5, minZ: -W.terrain.patchSize / 2 + 5, maxZ: W.terrain.patchSize / 2 - 5 } : null,
@@ -129,6 +130,13 @@ export class Engine {
       this.trees = new Trees(this, hf);
       this.modules.push(this.trees);
     }
+    if (W.shadows && !config.hide.has('shadows')) {
+      progress('Casting shadows', 0.68);
+      this.shadows = new Shadows(this, hf, W.shadows);
+      this.trees?.initShadow(this.shadows);
+      this.rocks?.initShadow(this.shadows);
+      this.modules.push(this.shadows);
+    }
     return { heightAt: (x, z) => hf.heightAt(x, z) };
   }
 
@@ -137,6 +145,7 @@ export class Engine {
     const r = this.renderer;
     try {
       await r.compileAsync(this.scene, this.camera);
+      if (this.shadows) await r.compileAsync(this.shadows.scene, this.shadows.cascades[0].cam);
       for (const m of this.post.materials) {
         this.post.quad.material = m;
         await r.compileAsync(this.post.scene, this.post.camera);
@@ -161,41 +170,46 @@ export class Engine {
   resize(force = false) {
     const cssW = Math.max(1, window.innerWidth), cssH = Math.max(1, window.innerHeight);
     const dpr = window.devicePixelRatio || 1;
-    let outW = Math.round(cssW * dpr), outH = Math.round(cssH * dpr);
-    // Cap the final pass at ~2.5 Mpx (the S23 Ultra's top setting is 4.4 Mpx).
-    const px = outW * outH;
-    if (px > ENGINE.maxCanvasPixels) {
-      const s = Math.sqrt(ENGINE.maxCanvasPixels / px);
-      outW = Math.round(outW * s); outH = Math.round(outH * s);
-    }
+    // Native canvas pixels (CSS size x devicePixelRatio): the resolution ceiling.
+    const outW = Math.round(cssW * dpr), outH = Math.round(cssH * dpr);
     this.outW = outW; this.outH = outH;
     this.renderer.setSize(outW, outH, false);
     const aspect = cssW / cssH;
-    const maxLong = Math.max(ENGINE.maxLongSide, config.res || 0);
-    const maxW = aspect >= 1 ? maxLong : Math.ceil(maxLong * aspect);
-    const maxH = aspect >= 1 ? Math.ceil(maxLong / aspect) : maxLong;
-    if (force || !this.post.b4 || Math.abs(this.allocAspect - aspect) > 0.01) {
+    // Screenshot / fixed-resolution runs may ask for more than the (small) headless canvas.
+    const fixedLong = config.res || 0;
+    const maxW = Math.max(outW, aspect >= 1 ? fixedLong : Math.ceil(fixedLong * aspect));
+    const maxH = Math.max(outH, aspect >= 1 ? Math.ceil(fixedLong / aspect) : fixedLong);
+    if (force || !this.post.b4 || this.allocW !== maxW || this.allocH !== maxH) {
       this.post.allocate(maxW + 8, maxH + 8);
-      this.allocAspect = aspect;
+      this.allocW = maxW; this.allocH = maxH;
     }
     this.aspect = aspect;
+    this.nativeW = outW; this.nativeH = outH;
+    this.governor.setNative(outW * outH);
     this.applyInternalRes();
     this.governor?.reset();
     this.ui?.updateRotateHint();
   }
 
   applyInternalRes() {
-    const L = this.governor.state.res;
+    const st = this.governor.state;
     const a = this.aspect;
     let w, h;
-    if (a >= 1) { w = L; h = Math.round(L / a); } else { h = L; w = Math.round(L * a); }
-    w = Math.min(w, this.post.maxW - 8) & ~3; h = Math.min(h, this.post.maxH - 8) & ~3;
+    if (this.photoPending) { w = this.nativeW; h = this.nativeH; }
+    else if (this.governor.fixedRes) {
+      const L = this.governor.fixedRes;
+      if (a >= 1) { w = L; h = Math.round(L / a); } else { h = L; w = Math.round(L * a); }
+    } else {
+      const P = Math.min(st.pixels, this.nativeW * this.nativeH);
+      w = Math.sqrt(P * a); h = w / a;
+      w = Math.min(Math.round(w), this.nativeW); h = Math.min(Math.round(h), this.nativeH);
+    }
+    w = Math.max(64, Math.min(w, this.post.maxW - 8)) & ~3; h = Math.max(64, Math.min(h, this.post.maxH - 8)) & ~3;
     this.intW = w; this.intH = h;
     this.post.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     G.uResolution.value.set(w, h);
-    const st = this.governor.state;
     this.post.shaftsEnabled = st.shafts;
     for (const m of this.modules) m.applyQuality?.(st);
   }
@@ -244,28 +258,32 @@ export class Engine {
     else if (a === 'look') this.setView(this.viewMode + 1);
     else if (a === 'hud') this.ui.setHud(!this.ui.hudOn);
     else if (a === 'quality') this.cycleQuality();
+    else if (a === 'photo') this.takePhoto();
     else if (a === 'bench') document.getElementById('bench-menu').classList.remove('hidden');
     else if (a === 'bench-stop') this.stopBench(true);
     else if (a === 'overdraw') this.showOverdraw = !this.showOverdraw;
   }
 
+  /** The quality button: Smooth (60 fps, default) <-> Sharp (30 fps, favours native). */
   cycleQuality() {
-    const modes = [
-      { mode: 'auto', fps: 60, label: 'auto 60' },
-      { mode: 'auto', fps: 30, label: 'battery 30' },
-      { mode: 'max', fps: 60, label: 'max' },
-      { mode: 'min', fps: 60, label: 'min' },
-    ];
-    this.qualityIndex = ((this.qualityIndex ?? 0) + 1) % modes.length;
-    const m = modes[this.qualityIndex];
-    this.governor.mode = m.mode;
-    this.governor.setTarget(m.fps);
-    this.loop?.setTargetFps(m.fps);
-    if (m.mode === 'auto' && this.qualityIndex === 0) this.governor.index = this.governor.startIndex;
-    this.governor.applyMode();
-    this.governor.reset();
+    const sharp = !this.governor.sharp;
+    this.governor.setSharp(sharp);
+    this.loop?.setTargetFps(this.governor.targetFps);
     this.applyInternalRes();
-    this.ui.label('quality', m.label);
+    this.ui.label('quality', sharp ? 'Sharp 30' : 'Smooth 60');
+  }
+
+  /** Photo: render one frame at full native resolution and hold it on screen. */
+  takePhoto() {
+    if (this.photoHeld) { this.photoHeld = false; this.ui.showPhoto(false); this.loop?.start(); return; }
+    this.loop?.stop();
+    this.photoPending = true;
+    this.applyInternalRes();
+    this.renderFrame(1 / 60, 16.7, true);
+    this.photoPending = false;
+    this.photoHeld = true;
+    this.ui.showPhoto(true, () => this.canvas.toDataURL('image/png'));
+    this.applyInternalRes();
   }
 
   startBench(minutes) {
@@ -291,6 +309,7 @@ export class Engine {
   // ---------------------------------------------------------------- frame
   update(dt) {
     this.time += dt;
+    this.lastDt = dt;
     G.uTime.value = this.time % 3600;
     const c = this.controller;
     if (this.bench.active) {
@@ -347,7 +366,7 @@ export class Engine {
     const g = this.governor.update(intervalMs, dt, missed, cpuMs, this.loop.vsync);
     if (g === 'changed') this.applyInternalRes();
     else if (g === 'burst') this.loop.requestBurst(30, (mean) => { if (this.governor.onBurst(mean)) this.applyInternalRes(); });
-    else if (g === 'fps30') this.loop.setTargetFps(30);
+    else if (g === 'fps30') this.loop.setTargetFps(this.governor.targetFps / 2);
     else if (g === 'fps60') this.loop.setTargetFps(this.governor.targetFps);
     if (this.bench.active) {
       const done = this.bench.record(intervalMs, Math.max(this.intW, this.intH), dt);
@@ -368,8 +387,11 @@ export class Engine {
     const px = new Uint8Array(4);
     const sync = () => { r.setRenderTarget(null); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
     this.setBookmark(0);
-    this.governor.index = this.governor.resIndex(1600);
+    const native = this.nativeW * this.nativeH;
+    const P0 = Math.min(native, 1.6e6);
+    this.governor.index = this.governor.indexForPixels(P0);
     this.applyInternalRes();
+    const P = this.intW * this.intH;
     progress('Measuring the easel', 0.96);
     for (let i = 0; i < 15; i++) this.renderFrame(1 / 60, 16.7, true);
     sync();
@@ -381,9 +403,15 @@ export class Engine {
       sync();
       best = Math.min(best, (performance.now() - t0) / 10);
     }
-    const start = best <= 8 ? 1800 : best <= 11 ? 1600 : best <= 13 ? 1440 : 1280;
     this.calibrationMs = best;
-    this.governor.index = this.governor.startIndex = this.governor.resIndex(start);
+    // Model: ~30 % fixed cost, ~70 % proportional to pixels. Start at the highest step whose
+    // predicted cost leaves headroom (<= 0.65 of the frame budget).
+    const target = 0.65 * this.governor.budget;
+    const predicted = (p) => best * (0.3 + 0.7 * p / P);
+    let pick = MIN_PIXELS;
+    for (const p of pixelSteps(native)) if (predicted(p) <= target) pick = p;
+    this.governor.calibratedPixels = pick;
+    this.governor.index = this.governor.startIndex = this.governor.sharp ? this.governor.ladder.length - 1 : this.governor.indexForPixels(pick);
     this.applyInternalRes();
     this.post.expoReset = true;
   }

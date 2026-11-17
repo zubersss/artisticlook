@@ -80,6 +80,22 @@ export class Rocks {
     this.items = items;
   }
 
+  /** Shadow casters: proxies sharing geometry and instance matrices. */
+  initShadow(shadows) {
+    const mat = makeMaterial({
+      name: 'shadow.rocks',
+      vertex: /* glsl */ `void main() { gl_Position = projectionMatrix * viewMatrix * modelMatrix * instanceMatrix * vec4(position, 1.0); }`,
+      fragment: 'void main() { fragColor = vec4(1.0); }',
+    });
+    for (const m of this.meshes) {
+      const p = new THREE.InstancedMesh(m.geometry, mat, m.count);
+      p.instanceMatrix = m.instanceMatrix;
+      p.count = m.count;
+      shadows.addCaster(p, 0);
+      this.engine.frame.anchor(p, 0, 0, 0);
+    }
+  }
+
   makeMaterial(Gd) {
     return makeMaterial({
       name: 'rocks',
@@ -143,7 +159,8 @@ export class Rocks {
             alb = mix(alb, uMossCol * 1.25, smoothstep(0.9, 0.92, id) * top);
           }
           float ao = mix(0.75, 1.0, smoothstep(-0.2, 0.5, vObj.y));
-          vec3 col = painterLight(alb, uViewMode > 1.5 ? Ns : N, 1.0, ao);
+          float sh = sunShadow(vRel, N, (h - 0.5) * 0.6);
+          vec3 col = painterLight(alb, uViewMode > 1.5 ? Ns : N, sh, ao);
           // Warm reflected light from the sunlit ground and sky fill: darks stay >= v 0.19.
           col += alb * (uGroundBounce * 3.0 * saturate(0.5 - N.y) + uSkyZenith * 0.6) * painterK();
           if (uViewMode > 0.5) col = chromaScale(col, 0.85 + 0.25 * saturate(1.0 - dot(N, uSunDir) * 2.0));
@@ -152,7 +169,7 @@ export class Rocks {
           // Backlit rim: a warm edge where the silhouette faces the Sun.
           vec3 V = -vRel / d;
           float rim = pow(1.0 - saturate(abs(dot(N, V))), 3.0) * pow(saturate(dot(-V, uSunDir)), 2.0);
-          col += uSunColor * uGlowHue * rim * 0.5 * painterK();
+          col += uSunColor * uGlowHue * rim * 0.5 * painterK() * sh;
           col = applyAerial(col, vRel, d);
           if (uOverdraw > 0.5) { fragColor = vec4(1.0 / 255.0); return; }
           fragColor = sceneOut(col, d);

@@ -103,7 +103,7 @@ export class Input {
     const k = e.code;
     if (isDown) {
       if (!this.keys.has(k)) {
-        const map = { KeyB: 'bookmark', KeyF: 'mode', KeyT: 'time', KeyV: 'look', KeyH: 'hud', KeyO: 'quality', KeyP: 'bench', KeyX: 'overdraw' };
+        const map = { KeyB: 'bookmark', KeyF: 'mode', KeyT: 'time', KeyV: 'look', KeyH: 'hud', KeyO: 'quality', KeyP: 'photo', KeyX: 'overdraw' };
         if (map[k]) this.onAction(map[k]);
         if (k >= 'Digit1' && k <= 'Digit9') this.onAction('bookmark:' + (Number(k.slice(5)) - 1));
       }

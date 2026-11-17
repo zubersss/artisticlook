@@ -7,13 +7,13 @@ const DECIDUOUS = {
   form: 'deciduous', height: [16, 19], baseRadius: [0.42, 0.5], forkAt: [0.3, 0.38], leanDeg: 5, limbWobble: 0.5,
   limbs: [4, 6], limbStart: 0.42, limbTilt: [45, 70], limbLength: [0.42, 0.56], clusterR: [2.4, 3.4], crown: 3,
   nearCards: 250, cardSize: [1.05, 1.45], cells: [0, 1, 2, 3, 4, 5, 6, 7],
-  midCards: 70, midCardSize: [2.4, 3.2], midCells: [8, 9, 10, 11, 12, 13, 14, 15],
+  midCards: 72, midCardSize: [2.1, 2.7], midCells: [8, 9, 10, 11, 12, 13, 14, 15],
   bark: { base: '#9c8266', dark: '#705a54', moss: '#c0a830', mossShade: '#4b5020' }, glow: 2.2,
 };
 const CONIFER = {
   form: 'conifer', height: [18, 24], baseRadius: [0.3, 0.38], forkAt: [0.9, 0.95], leanDeg: 2, tiers: 14, crownRadius: 3.8,
-  nearCards: 250, cardSize: [1.1, 1.5], cells: [0, 1, 2, 3, 4, 5, 6, 7],
-  midCards: 90, midCardSize: [1.5, 2.0], midCells: [8, 9, 10, 11, 12, 13, 14, 15],
+  nearCards: 250, cardSize: [0.9, 1.25], cells: [0, 1, 2, 3, 4, 5, 6, 7], cardAspect: 1.7, cardRoll: 0.35, // drooping tiers
+  midCards: 90, midCardSize: [1.3, 1.8], midCells: [8, 9, 10, 11, 12, 13, 14, 15],
   bark: { base: '#8a6448', dark: '#4e4044', moss: '#8a9030', mossShade: '#3e4a1e' }, glow: 0.12,
 };
 
@@ -148,6 +148,15 @@ export default {
     wet: '#3b3427',
   },
 
+  // --- Sun shadows: two cascades around the camera ---
+  shadows: {
+    near: { radius: 120, size: [2048, 1024], move: 4, depth: 1200, heightRange: 45, grid: 128 },
+    far: { radius: 900, size: [2048, 1024], move: 40, depth: 3000, heightRange: 260, grid: 128 },
+    softness: 1.2, // filter spread in texels
+    farInterval: 0.25, // minimum seconds between far-cascade updates (the governor raises it)
+    sunMove: 1e-7,
+  },
+
   // --- Brushwork ---
   brush: {
     textureSize: 512, seed: 1234,
@@ -173,7 +182,8 @@ export default {
     canopyLift: 11, // ... raised to crown height (m)
     forest: {
       seed: 3141, extent: 330, cell: 8, maxTrees: 2500, densityPower: 1.1,
-      clumpScale: 60, mix: 0.25, coniferThreshold: 0.42, scale: [0.7, 1.35],
+      clumpScale: 60, mix: 0.25, coniferThreshold: 0.42, scale: [0.6, 1.45],
+      groupChance: 0.35, saplings: 0.5, pathGiants: 9, // groups of 2-3, young edges, old trees by the path
       bookmarkClearance: 5, heroClearance: 8,
     },
     heroVariant: 0,
@@ -185,7 +195,7 @@ export default {
       { ...DECIDUOUS, name: 'beech-gold', seed: 23, weight: 0.2, neighbour: 4, height: [17, 21], limbTilt: [30, 50], clusterR: [2.0, 2.8],
         palette: { lit: '#f0c840', mid: '#c89422', interior: '#5e4416', glow: '#f2d050' } },
       { ...DECIDUOUS, name: 'red-maple', seed: 37, weight: 0.1, neighbour: 0, height: [13, 16], clusterR: [1.8, 2.5],
-        palette: { lit: '#e06a2a', mid: '#a8401e', interior: '#542818', glow: '#f0862c' } },
+        palette: { lit: '#e2702c', mid: '#ac4a20', interior: '#5a3418', glow: '#f0862c' } },
       { ...DECIDUOUS, name: 'russet-oak', seed: 41, weight: 0.16, neighbour: 0, height: [15, 18], limbTilt: [50, 70], limbLength: [0.42, 0.55], baseRadius: [0.48, 0.58],
         palette: { lit: '#c88c40', mid: '#985a26', interior: '#4a2c16', glow: '#e0a048' } },
       { ...DECIDUOUS, name: 'aspen', seed: 53, weight: 0.18, neighbour: 1, height: [15, 19], baseRadius: [0.28, 0.36], limbTilt: [22, 40], clusterR: [1.6, 2.3],
@@ -194,10 +204,10 @@ export default {
       { ...DECIDUOUS, name: 'turning-green', seed: 67, weight: 0.12, neighbour: 1,
         palette: { lit: '#c4c040', mid: '#7a8a30', interior: '#34441c', glow: '#dcd440' } },
       { ...CONIFER, name: 'spruce', seed: 71, weight: 0.6,
-        palette: { lit: '#6a8048', mid: '#3e5a3a', interior: '#2a3a26', glow: '#7a9050' }, glow: 0.12 },
+        palette: { lit: '#7a9050', mid: '#4e6a42', interior: '#34482e', glow: '#8aa058' }, glow: 0.12 },
       { ...CONIFER, name: 'pine', seed: 83, weight: 0.4, height: [16, 22], crownRadius: 3.4, tiers: 11,
         bark: { base: '#9a6848', dark: '#5a4648', moss: '#8a9030', mossShade: '#3e4a1e' },
-        palette: { lit: '#808a48', mid: '#4a603c', interior: '#2c3a28', glow: '#909a50' }, glow: 0.15 },
+        palette: { lit: '#8c9850', mid: '#566c44', interior: '#3a4a30', glow: '#9aa858' }, glow: 0.15 },
     ],
   },
 
@@ -217,7 +227,7 @@ export default {
   // --- Camera bookmarks (yaw = azimuth in degrees clockwise from north) ---
   bookmarks: [
     { name: 'path', pos: [44, null, -40], yaw: 228, pitch: 3, mode: 'walk' },
-    { name: 'clearing', pos: [-78, null, 18], yaw: 105, pitch: 2, mode: 'walk' },
+    { name: 'clearing', pos: [-70, null, 20], yaw: 105, pitch: -1, mode: 'walk' },
     { name: 'backlit', pos: [-12, null, 70], yaw: 236, pitch: 14, mode: 'walk' },
     { name: 'hill', pos: [-212, null, -208], height: 3.5, yaw: 300, pitch: -2, mode: 'fly' },
     { name: 'aerial', pos: [60, null, 300], height: 200, yaw: 345, pitch: -40, mode: 'fly' },

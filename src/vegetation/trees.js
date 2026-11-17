@@ -22,7 +22,7 @@ invariant gl_Position;
 in vec2 aCorner;
 in vec4 aCluster;
 in vec4 aCard;   // cell, roll, size, rank
-in vec4 aTint;   // random, random, random, shell depth (r / R)
+in vec4 aTint;   // random, random, card aspect, shell depth (r / R)
 uniform float uRankCut;
 uniform vec4 uLodFade;  // x in-start, y in-end, z out-start, w out-end (m)
 uniform float uCardScale;
@@ -33,6 +33,7 @@ out vec3 vSN;            // sphere normal (world)
 out vec4 vTint;
 flat out float vCell;
 flat out float vInst;    // per-tree random
+out float vSun;          // sun visibility at the card (per vertex)
 out vec4 vGlow;          // rgb transmitted light, a = shell depth
 void main() {
   mat4 M = modelMatrix * instanceMatrix;
@@ -56,7 +57,7 @@ void main() {
   mv.xy += off;
   gl_Position = projectionMatrix * mv;
   vec2 cell = vec2(mod(aCard.x, 4.0), floor(aCard.x / 4.0));
-  vUv = (cell + 0.5 + aCorner * 0.47) * 0.25;
+  vUv = (cell + 0.5 + aCorner * vec2(1.0 / max(aTint.z, 0.1), 1.0) * 0.47) * 0.25;
   vRel = c.xyz;
   // Normal: cluster sphere blended with the whole crown, so clusters merge into one
   // lit mass with a shaded underside instead of separate cotton balls.
@@ -72,6 +73,8 @@ void main() {
   float q = dot(pc, pc) - R * R;
   float chord = max(0.0, -b + sqrt(max(b * b - q, 0.0)));
   float crownDepth = clamp(length(c.xyz - crownC) / (uCrown.w * sc), 0.0, 1.0);
+  // Shadow at the card centre, nudged toward the Sun past the card's own caster.
+  vSun = sunShadow(c.xyz + uSunDir * 1.6, normalize(c.xyz - cc + 1e-4), 0.0);
   // Painted leaves are thin: light carries a long way through a crown, strongest at its rim.
   vGlow = vec4(vec3(exp(-0.22 * chord) * mix(0.6, 1.25, smoothstep(0.45, 0.95, crownDepth))), aTint.w * mix(0.55, 1.0, smoothstep(0.35, 0.85, crownDepth)));
 }`;
@@ -108,6 +111,7 @@ const COLOR_FRAG = /* glsl */ `
         flat in float vCell;
         in vec4 vGlow;
         flat in float vInst;
+        in float vSun;
         void main() {
           vec4 t = texture(tDabs, vUv);
           t.r = max(t.r, uForceOpaque);
@@ -126,7 +130,7 @@ const COLOR_FRAG = /* glsl */ `
           alb = oklabJitter(alb, (id - 0.5) * radians(24.0), 0.14 * cos(6.2831 * id * 2.0), (fract(id * 3.7) - 0.5) * 0.4);
           alb = mix(uLeafDeep, alb, mix(0.45, 1.0, ao));
           vec3 N = normalize(mix(vSN, V, 0.2));
-          vec3 col = painterLight(alb, N, 1.0, ao);
+          vec3 col = painterLight(alb, N, vSun, ao);
           if (uViewMode > 0.5) {
             // Foliage shade is burnt umber with its chroma kept, never crimson or black:
             // value floored at ~22 % of the sunlit leaf.
@@ -134,7 +138,15 @@ const COLOR_FRAG = /* glsl */ `
             float litL = luma(alb * uSunColor) * 0.6;
             float shadeW = 1.0 - smoothstep(0.0, 0.5, dot(N, uSunDir) + 0.2);
             vec3 umber = uLeafDeep / max(luma(uLeafDeep), 1e-4);
-            col = mix(col, umber * max(L, litL * 0.22), max(shadeW * 0.85, 1.0 - smoothstep(0.0, litL * 0.3, L)));
+            float shellW2 = smoothstep(0.75, 1.0, shell);
+            float floorL = litL * mix(0.22, 0.4, shellW2); // outer dabs never read as holes
+            col = mix(col, umber * max(L, floorL), max(shadeW * 0.85, 1.0 - smoothstep(0.0, floorL * 1.4, L)));
+            // Dark values lean to burnt umber (hue ~30 deg), never crimson.
+            vec3 o = toOklab(col);
+            float darkW = 1.0 - smoothstep(0.02, 0.09, luma(col));
+            vec3 ou = toOklab(umber * luma(col));
+            o.yz = mix(o.yz, ou.yz * (length(o.yz) / max(length(ou.yz), 1e-4)), darkW * 0.7);
+            col = max(fromOklab(o), vec3(0.0));
           }
           // Backlight. (a) The whole crown transmits warm orange light (wide lobe): the body
           // stays orange. (b) Thin fringe dabs within ~25 deg of the Sun turn gold (narrow lobe).
@@ -146,7 +158,7 @@ const COLOR_FRAG = /* glsl */ `
           vec3 body = alb * 1.3 * Es * 0.35 * wide * vGlow.rgb;
           vec3 fringe = uLeafGlow * Es * 0.42 * narrow * vGlow.rgb * shellW * (0.5 + 0.5 * step(0.25, fract(id * 5.1)));
           fringe = chromaScale(fringe, 1.25); // saturated gold, not chalky cream
-          col += (body + fringe) * mix(0.5, 1.0, painterK());
+          col += (body + fringe) * mix(0.5, 1.0, painterK()) * mix(0.35, 1.0, vSun);
           col = applyAerial(col, vRel, d);
           if (uOverdraw > 0.5) { fragColor = vec4(1.0 / 255.0); return; }
           fragColor = sceneOut(col, d);
@@ -197,7 +209,8 @@ const TRUNK_FRAG = /* glsl */ `
           alb = mix(alb, mix(uMossShade, uMossCol, sunSide), clamp(moss, 0.0, 0.9));
           vec3 bn = vec3(b.g, b.b, 0.0) * 2.0 - 1.0;
           vec3 Ns = normalize(N + 0.25 * (bn.x * normalize(cross(N, vec3(0.0, 1.0, 0.0)) + 1e-4) + bn.y * vec3(0.0, 1.0, 0.0)) * painterK());
-          vec3 col = painterLight(alb, Ns, 1.0, mix(0.6, 1.0, smoothstep(0.0, 1.5, vBark.z)));
+          float sh = sunShadow(vRel, N, (b.r - 0.5) * 0.5);
+          vec3 col = painterLight(alb, Ns, sh, mix(0.6, 1.0, smoothstep(0.0, 1.5, vBark.z)));
           // Shade side: cool mauve reflected light and warm chroma (never neutral black).
           // Warm light bounced from the sunlit ground keeps backlit trunks umber, not black.
           float shadeSide = saturate(0.3 - dot(N, uSunDir));
@@ -212,7 +225,7 @@ const TRUNK_FRAG = /* glsl */ `
           // Gold rim when backlit, broken into strokes on the Sun side.
           float rim = pow(1.0 - saturate(abs(dot(N, V))), 4.0) * pow(saturate(dot(-V, uSunDir)), 2.0) * (vBark.w < 0.5 ? 1.0 : 0.15);
           rim *= smoothstep(0.3, 0.6, fract(b.a * 3.7)) * saturate(dot(N, normalize(uSunDir - V * dot(uSunDir, V))) * 2.0);
-          col += uSunColor * vec3(1.0, 0.72, 0.2) * rim * 1.1 * painterK();
+          col += uSunColor * vec3(1.0, 0.72, 0.2) * rim * 1.1 * painterK() * sh;
           col = applyAerial(col, vRel, d);
           if (uOverdraw > 0.5) { fragColor = vec4(1.0 / 255.0); return; }
           fragColor = sceneOut(col, d);
@@ -318,8 +331,9 @@ export class Trees {
     const seed = rec.seed ?? (11 + vi * 13);
     const tree = generateTree(rec, seed);
     const treeFar = generateTree(rec, seed, { simple: true });
-    const near = buildCards(tree.clusters, rec.nearCards ?? 250, rec.cells ?? [0, 1, 2, 3, 4, 5, 6, 7], rec.cardSize ?? [1.0, 1.4], seed + 1);
-    const far = buildCards(tree.clusters, rec.midCards ?? 70, rec.midCells ?? [8, 9, 10, 11, 12, 13, 14, 15], rec.midCardSize ?? [2.4, 3.2], seed + 2, { quads: true });
+    const cardOpts = { aspect: rec.cardAspect ?? 1, roll: rec.cardRoll ?? Math.PI };
+    const near = buildCards(tree.clusters, rec.nearCards ?? 250, rec.cells ?? [0, 1, 2, 3, 4, 5, 6, 7], rec.cardSize ?? [1.0, 1.4], seed + 1, cardOpts);
+    const far = buildCards(tree.clusters, rec.midCards ?? 70, rec.midCells ?? [8, 9, 10, 11, 12, 13, 14, 15], rec.midCardSize ?? [2.4, 3.2], seed + 2, { ...cardOpts, quads: true });
     const pal = rec.palette;
     const nb = V.variants[rec.neighbour ?? vi].palette;
     const L = this.lod;
@@ -359,7 +373,7 @@ export class Trees {
     const preFar = mkMesh(far.geometry, mFar.pre, cap.far, 11, trunkFar);
     const colFar = mkMesh(far.geometry, mFar.col, cap.far, 21, trunkFar);
     return {
-      rec, tree, height: tree.height, crownR: per.uCrown.value.w, crownY: per.uCrown.value.y,
+      rec, tree, treeFar, farCards: far, per, height: tree.height, crownR: per.uCrown.value.w, crownY: per.uCrown.value.y,
       near: { meshes: [trunkNear, preNear, colNear], cap: cap.near, n: 0, keys: new Float64Array(cap.near), ids: new Int32Array(cap.near) },
       far: { meshes: [trunkFar, preFar, colFar], cap: cap.far, n: 0, keys: new Float64Array(cap.far), ids: new Int32Array(cap.far) },
     };
@@ -388,9 +402,25 @@ export class Trees {
         const c = 0.5 + 0.5 * gnoise(x / F.clumpScale, z / F.clumpScale, 99) + (rng.next() - 0.5) * (F.mix ?? 0.35);
         const conifer = gnoise(x / (F.clumpScale * 1.7) + 50, z / (F.clumpScale * 1.7), 7) > (F.coniferThreshold ?? 0.45);
         const v = pickWeighted(weights, Math.min(0.999, Math.max(0, c)), V.variants, conifer);
-        // Younger, smaller trees where the forest thins out (edges, clearings).
-        const s = rng.range(F.scale[0], F.scale[1]) * (0.6 + 0.4 * Math.min(1, d / 0.7));
-        cand.push({ x, z, yaw: rng.next() * Math.PI * 2, s, v, r: rng.next() });
+        // Age: a long tail of young trees, a few old giants; smaller where the forest thins.
+        const age = Math.pow(rng.next(), 0.8);
+        let s = (F.scale[0] + (F.scale[1] - F.scale[0]) * age) * (0.65 + 0.35 * Math.min(1, d / 0.7));
+        // Old spreading trees close to the path lean over it.
+        const pd = hf.pathDistance ? hf.pathDistance(x, z) : 1e9;
+        if (pd < (F.pathGiants ?? 0)) s *= 1.15 + 0.25 * rng.next();
+        const wr = rng.range(0.85, 1.25); // crown width : height variety
+        cand.push({ x, z, yaw: rng.next() * Math.PI * 2, s, w: wr, v, r: rng.next() });
+        // Trees grow in groups of 2-3 with uneven gaps.
+        if (rng.next() < (F.groupChance ?? 0.35)) {
+          const a = rng.next() * Math.PI * 2, rr = rng.range(2.5, 5);
+          const x2 = x + Math.cos(a) * rr, z2 = z + Math.sin(a) * rr;
+          if (hf.maskAt(x2, z2, 2) > 0.25) cand.push({ x: x2, z: z2, yaw: rng.next() * 6.28, s: s * rng.range(0.6, 0.95), w: rng.range(0.85, 1.25), v, r: rng.next() });
+        }
+        // Saplings and young crowns step the forest edge down.
+        if (d > 0.12 && d < 0.55 && rng.next() < (F.saplings ?? 0.5)) {
+          const a = rng.next() * Math.PI * 2, rr = rng.range(2, 4.5);
+          cand.push({ x: x + Math.cos(a) * rr, z: z + Math.sin(a) * rr, yaw: rng.next() * 6.28, s: rng.range(0.4, 0.62), w: rng.range(0.9, 1.3), v, r: rng.next() * 0.8 });
+        }
       }
     }
     // Cap the count by random selection (never by raster order).
@@ -401,10 +431,10 @@ export class Trees {
     const n = list.length;
     this.count = n;
     this.tx = new Float32Array(n); this.ty = new Float32Array(n); this.tz = new Float32Array(n);
-    this.tcos = new Float32Array(n); this.tsin = new Float32Array(n); this.ts = new Float32Array(n); this.tv = new Uint8Array(n);
+    this.tcos = new Float32Array(n); this.tsin = new Float32Array(n); this.ts = new Float32Array(n); this.tw = new Float32Array(n); this.tv = new Uint8Array(n);
     list.forEach((t, i) => {
       this.tx[i] = t.x; this.tz[i] = t.z; this.ty[i] = hf.heightAt(t.x, t.z) - 0.25;
-      this.tcos[i] = Math.cos(t.yaw); this.tsin[i] = Math.sin(t.yaw); this.ts[i] = t.s; this.tv[i] = t.v;
+      this.tcos[i] = Math.cos(t.yaw); this.tsin[i] = Math.sin(t.yaw); this.ts[i] = t.s; this.tw[i] = t.w ?? 1; this.tv[i] = t.v;
     });
   }
 
@@ -453,7 +483,7 @@ export class Trees {
     const meshes = pool.meshes;
     const arr = meshes[0].instanceMatrix.array;
     for (let i = 0; i < n; i++) {
-      const t = id[i], o = i * 16, s = this.ts[t], c = this.tcos[t] * s, sn = this.tsin[t] * s;
+      const t = id[i], o = i * 16, s = this.ts[t], sw = s * this.tw[t], c = this.tcos[t] * sw, sn = this.tsin[t] * sw;
       arr[o] = c; arr[o + 1] = 0; arr[o + 2] = -sn; arr[o + 3] = 0;
       arr[o + 4] = 0; arr[o + 5] = s; arr[o + 6] = 0; arr[o + 7] = 0;
       arr[o + 8] = sn; arr[o + 9] = 0; arr[o + 10] = c; arr[o + 11] = 0;
@@ -462,6 +492,67 @@ export class Trees {
     const im = meshes[0].instanceMatrix;
     im.clearUpdateRanges(); im.addUpdateRange(0, n * 16); im.needsUpdate = true;
     for (const m of meshes) { m.count = n; m.visible = n > 0; }
+  }
+
+  /** Shadow casters: per variant, the far trunk and the far leaf cards (alpha tested, facing
+   *  the Sun because cards face whatever camera renders them), in the shadow scene. */
+  initShadow(shadows) {
+    this.shadows = shadows;
+    const noFade = { uLodFade: { value: new THREE.Vector4(-1, 0, 1e6, 1e6 + 1) } };
+    for (let v = 0; v < this.variants.length; v++) {
+      const vr = this.variants[v];
+      let n = 0;
+      for (let i = 0; i < this.count; i++) if (this.tv[i] === v) n++;
+      n = Math.max(1, n);
+      const u = Object.assign({}, this.shared, vr.per, noFade, { uCardScale: { value: 0.85 } });
+      const cardMat = makeMaterial({
+        name: 'shadow.cards', chunks: [GLSL_LIGHTING], uniforms: u,
+        vertex: CARD_VERT,
+        fragment: /* glsl */ `
+          uniform sampler2D tDabs;
+          in vec2 vUv;
+          void main() { if (texture(tDabs, vUv).r < 0.5) discard; fragColor = vec4(1.0); }`,
+      });
+      const trunkMat = makeMaterial({ name: 'shadow.trunk', chunks: [GLSL_LIGHTING], vertex: TRUNK_VERT, fragment: 'void main() { fragColor = vec4(1.0); }' });
+      const trunk = new THREE.InstancedMesh(vr.treeFar.trunk, trunkMat, n);
+      const cards = new THREE.InstancedMesh(vr.farCards.geometry, cardMat, n);
+      cards.instanceMatrix = trunk.instanceMatrix;
+      trunk.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      for (const m of [trunk, cards]) {
+        m.count = 0;
+        shadows.addCaster(m, 'both');
+        this.engine.frame.anchor(m, 0, 0, 0);
+      }
+      vr.shadow = { trunk, cards, cap: n, ids: new Int32Array(n) };
+    }
+  }
+
+  /** Fill the shadow casters with every tree within reach of a cascade (all directions). */
+  fillShadow(cascade, radius) {
+    if (!this.shadows) return;
+    const f = this.engine.frame.cam;
+    const reach = cascade === 0 ? radius + 60 : Math.min(radius, 320);
+    const r2 = reach * reach;
+    for (let v = 0; v < this.variants.length; v++) {
+      const sh = this.variants[v].shadow;
+      const arr = sh.trunk.instanceMatrix.array;
+      let n = 0;
+      for (let i = 0; i < this.count; i++) {
+        if (this.tv[i] !== v) continue;
+        const dx = this.tx[i] - f[0], dz = this.tz[i] - f[2];
+        if (dx * dx + dz * dz > r2 || n >= sh.cap) continue;
+        const o = n * 16, s = this.ts[i], sw = s * this.tw[i], c = this.tcos[i] * sw, sn = this.tsin[i] * sw;
+        arr[o] = c; arr[o + 1] = 0; arr[o + 2] = -sn; arr[o + 3] = 0;
+        arr[o + 4] = 0; arr[o + 5] = s; arr[o + 6] = 0; arr[o + 7] = 0;
+        arr[o + 8] = sn; arr[o + 9] = 0; arr[o + 10] = c; arr[o + 11] = 0;
+        arr[o + 12] = this.tx[i]; arr[o + 13] = this.ty[i]; arr[o + 14] = this.tz[i]; arr[o + 15] = 1;
+        n++;
+      }
+      const im = sh.trunk.instanceMatrix;
+      im.clearUpdateRanges(); im.addUpdateRange(0, n * 16); im.needsUpdate = true;
+      sh.trunk.count = n; sh.cards.count = n;
+      sh.trunk.visible = sh.cards.visible = n > 0;
+    }
   }
 
   makePrepass(uniforms) {

@@ -223,7 +223,7 @@ export class Terrain {
 
         // One lattice of painted crowns (cell size in metres): lobed, domed crowns in stands,
         // dark-saturated shade side, gold fringe toward the Sun, warm gaps between.
-        void paintedCrowns(vec2 p, float cs, float forest, float clump, vec3 N, vec3 groundAlb,
+        void paintedCrowns(vec2 p, float cs, float forest, float clump, vec3 N, vec3 groundAlb, vec2 rdir, float stretch,
                            inout vec3 outCol, inout vec3 outN, inout float outAO) {
           vec2 g = p / cs;
           vec2 cell = floor(g);
@@ -237,7 +237,11 @@ export class Terrain {
             float r = cs * (0.38 + 0.5 * float((h >> 16) & 255u) / 255.0);
             vec2 dv = p - ctr;
             float lob = 1.0 + 0.16 * cos(atan(dv.y, dv.x) * 5.0 + float(h & 63u));
-            float dd = length(dv) / (r * lob);
+            // Seen at a grazing angle a dome stands up: elongate toward the viewer so the
+            // crown reads round on screen instead of a flat dash.
+            float rad = dot(dv, rdir);
+            vec2 dvs = dv - rdir * rad * (1.0 - 1.0 / stretch);
+            float dd = length(dvs) / (r * lob);
             if (dd < best) { best = dd; bc = ctr; bh = h; br = r * lob; }
           }
           // Species in stands (30-80 m) from a smooth field; greens as separate stands.
@@ -260,7 +264,8 @@ export class Terrain {
           crown = mix(chromaScale(crown * vec3(0.6, 0.5, 0.42), 1.15), crown, lit);
           float sunward = saturate(dot(normalize(q + 1e-4), normalize(uSunDir.xz + 1e-4)));
           crown = mix(crown, uGlowHue * luma(crown) * 1.8, sunward * smoothstep(0.45, 0.95, best) * 0.6);
-          vec3 gapCol = mix(groundAlb, uCanopyGap, smoothstep(0.35, 0.75, forest) * exists);
+          // Gaps are the canopy's own shadow, not the forest floor.
+          vec3 gapCol = mix(groundAlb, mix(uCanopyGap, crown * vec3(0.55, 0.48, 0.42), 0.5), smoothstep(0.35, 0.75, forest) * exists);
           outCol = mix(gapCol, crown, inside);
           outN = normalize(mix(N, Ns, inside));
           outAO = mix(0.7, mix(0.8, 1.0, z), inside);
@@ -327,8 +332,10 @@ export class Terrain {
             float wNear = 1.0 - smoothstep(450.0, 850.0, dist);
             float wFar = smoothstep(450.0, 850.0, dist) * (1.0 - smoothstep(3000.0, 5500.0, dist));
             vec3 cA = can, cB = can; vec3 nA = N, nB = N; float aoA = crownAO, aoB = crownAO;
-            if (wNear > 0.0) paintedCrowns(wp.xz, 8.0, forest, clump, N, alb, cA, nA, aoA);
-            if (wFar > 0.0) paintedCrowns(wp.xz, 22.0, forest, clump, N, alb, cB, nB, aoB);
+            vec2 rdir = normalize(vRel.xz + 1e-4);
+            float stretch = clamp(1.0 / max(abs(dot(vRel / dist, N)), 0.05), 1.0, 2.5);
+            if (wNear > 0.0) paintedCrowns(wp.xz, 8.0, forest, clump, N, alb, rdir, stretch, cA, nA, aoA);
+            if (wFar > 0.0) paintedCrowns(wp.xz, 22.0, forest, clump, N, alb, rdir, stretch, cB, nB, aoB);
             float wSum = wNear + wFar;
             if (wSum > 0.0) {
               vec3 cc = (cA * wNear + cB * wFar) / wSum;
@@ -346,7 +353,7 @@ export class Terrain {
           // aerial perspective then walks it toward the cool distance hue.
           alb = mix(alb, uRidge, smoothstep(3500.0, 9000.0, dist) * 0.6);
 
-          float ao = (1.0 - 0.45 * forest * (1.0 - canopyW)) * cAO;
+          float ao = (1.0 - 0.35 * forest * (1.0 - canopyW)) * cAO;
           vec3 Ns = N;
           float strokeFleck = 0.0, strokeH = 0.5, sheenW = 0.0;
           if (uViewMode > 1.5) {
@@ -402,7 +409,9 @@ export class Terrain {
             strokeFleck = smoothstep(0.895, 0.905, b.id); // ~5 % of strokes once blended
             sheenW = smoothstep(0.55, 0.85, b.h) * saturate(1.0 - (b.lod - 1.0) / 3.0);
           }
-          vec3 col = painterLight(alb, Ns, 1.0, ao);
+          // Sun shadow (cascades), with the stroke's paint height brushing the edge.
+          float sh = mix(sunShadow(vRel, N, strokeH - 0.5), 1.0, canopyW);
+          vec3 col = painterLight(alb, Ns, sh, ao);
           if (uViewMode > 1.5) {
             // Flecks: dark blue-green shadow strokes in shade; warm lit dabs (and a few cool
             // sky notes) in light.
@@ -417,7 +426,7 @@ export class Terrain {
             vec3 V = -vRel / dist;
             vec3 Hh = normalize(uSunDir + V);
             float F = 0.04 + 0.96 * pow(1.0 - saturate(dot(V, Ns)), 5.0);
-            col += uSunColor * 0.08 * F * pow(saturate(dot(Ns, Hh)), 20.0) * sheenW;
+            col += uSunColor * 0.08 * F * pow(saturate(dot(Ns, Hh)), 20.0) * sheenW * sh;
           }
           col = applyAerial(col, vRel, dist);
           if (uOverdraw > 0.5) { fragColor = vec4(1.0 / 255.0); return; }

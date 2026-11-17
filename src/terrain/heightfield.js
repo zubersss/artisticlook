@@ -237,7 +237,7 @@ export class Heightfield {
         if (path) { const half = path.carve.width / 2; pm = 1 - smoothstep(half - 0.4, half + 0.9, path.dist[k]); }
         if (stream) { const half = stream.carve.width / 2; wm = 1 - smoothstep(half, half + stream.carve.bankWidth, stream.dist[k]); }
         let fd = this.forestDensity(x, z);
-        if (path) fd *= smoothstep(path.carve.width * 0.5 + 1, path.carve.width * 0.5 + 6, path.dist[k]);
+        if (path) fd *= smoothstep(path.carve.width * 0.5 + 0.8, path.carve.width * 0.5 + 3.5, path.dist[k]);
         if (stream) fd *= smoothstep(stream.carve.width * 0.5 + 1, stream.carve.width * 0.5 + 4, stream.dist[k]);
         let meadow = 0;
         for (const c of this.r.clearings || []) meadow = Math.max(meadow, 1 - smoothstep(c.radius * 0.7, c.radius * 1.15, Math.hypot(x - c.x, z - c.z)));
@@ -359,6 +359,15 @@ export class Heightfield {
     if (w <= 0) return hf;
     const hn = this.sampleGrid(this.near, NEAR, x, z);
     return hf + (hn - hf) * w;
+  }
+
+  /** Distance (m) to the path centre line on the near grid (1e9 outside it). */
+  pathDistance(x, z) {
+    const sp = this.splines.path;
+    if (!sp) return 1e9;
+    const i = Math.round(x - NEAR.origin), j = Math.round(z - NEAR.origin);
+    if (i < 0 || j < 0 || i >= NEAR.N || j >= NEAR.N) return 1e9;
+    return sp.dist[j * NEAR.N + i];
   }
 
   maskAt(x, z, channel) {

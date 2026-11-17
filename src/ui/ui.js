@@ -86,6 +86,20 @@ export class UI {
     this.hudAccum = 0; this.hudFrames = 0; this.hudMsSum = 0; this.hudMsMax = 0;
   }
 
+  /** Show or hide the photo bar; getImage() returns a PNG data URL of the held frame. */
+  showPhoto(on, getImage) {
+    document.body.classList.toggle('photo', on);
+    $('photo-bar').classList.toggle('hidden', !on);
+    if (!on) return;
+    $('photo-save').onclick = () => {
+      const a = document.createElement('a');
+      a.href = getImage();
+      a.download = `painted-${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+    };
+    $('photo-back').onclick = () => this.onAction('photo');
+  }
+
   benchRunning(on, text) {
     this.el.benchBanner.classList.toggle('hidden', !on);
     if (text != null) this.el.benchProgress.textContent = text;

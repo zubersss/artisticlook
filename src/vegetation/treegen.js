@@ -202,8 +202,9 @@ export function buildCards(clusters, budget, cells, size, seed, opts = {}) {
       const p = c.c.clone().addScaledVector(d, c.r * t);
       centers.push(p.x, p.y, p.z);
       cl.push(c.c.x, c.c.y, c.c.z, c.r);
-      card.push(cells[rng.int(cells.length)], rng.next() * Math.PI * 2, rng.range(size[0], size[1]), 0);
-      tint.push(rng.next(), rng.next(), rng.next(), t);
+      const roll = opts.roll ?? Math.PI;
+      card.push(cells[rng.int(cells.length)], roll >= Math.PI ? rng.next() * Math.PI * 2 : (rng.next() - 0.5) * 2 * roll, rng.range(size[0], size[1]), 0);
+      rng.next(); tint.push(rng.next(), rng.next(), opts.aspect ?? 1, t); // z = card aspect (for uv)
       rankIndex++;
     }
   }
@@ -225,7 +226,7 @@ export function buildCards(clusters, budget, cells, size, seed, opts = {}) {
     for (let i = 0; i < V; i++) {
       const o = q * V + i;
       pos.set(centers.slice(q * 3, q * 3 + 3), o * 3);
-      corner[o * 2] = oct[i][0] * (opts.outline ?? 0.96); corner[o * 2 + 1] = oct[i][1] * (opts.outline ?? 0.96);
+      corner[o * 2] = oct[i][0] * (opts.outline ?? 0.96) * (opts.aspect ?? 1); corner[o * 2 + 1] = oct[i][1] * (opts.outline ?? 0.96);
       aCl.set(cl.slice(q * 4, q * 4 + 4), o * 4);
       aCard.set(card.slice(q * 4, q * 4 + 4), o * 4);
       aTint.set(tint.slice(q * 4, q * 4 + 4), o * 4);

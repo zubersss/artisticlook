@@ -230,6 +230,21 @@ lit/shade sides, sizes 0.38–0.88 of the cell, meadow strips from a density fie
 conifers: 14 tiers tapering, overlapping clusters, smaller far cards (1.5–2 m), lighter greens.
 Budget after: ≤ 403k triangles, ≤ 51 draw calls, overdraw ≤ 1.35 shaded / 1.91 all.
 
+### Stage 5 (forest), round 2
+Gaps: (1) still a park/orchard: even spacing, same-age trees, flat crown band, canopy never closes,
+sky 34–75 % of the top; (2) aerial/far canopy a texture (fish-scale shards, near-black gaps, tweed
+rug of dashes in the far painted forest); (3) mid-distance crowns with oversized coin dabs (3–7 % H,
+bigger than near dabs; popping at the switch), identical lollipop shapes; (4) crimson crown darks on
+the outer silhouette reading as holes; (5) conifers as columns of blobs, brown-black.
+Changes: trees in groups of 2–3 (35 %), long-tailed ages (0.6–1.45 scale), old giants within 9 m of the
+path (×1.15–1.4) and the forest allowed closer to the path, saplings (0.4–0.6) stepping the edges
+down, per-tree crown width/height ratio 0.85–1.25; far atlas cells now hold 20–27 small dabs
+(r 0.065–0.095 of the cell) on 2.1–2.7 m cards, so far dabs match near ones; outer-shell dabs keep a
+higher value floor and dark values rotate to burnt umber (Oklab); red-maple interior umber-red;
+conifer cards elongated 1.7:1 and nearly horizontal (drooping tiers), 250/90 cards, lighter greens;
+painted crowns elongate toward the viewer at grazing angles (round on screen), gaps painted in the
+canopy's own shadow colour; forest-floor AO lighter; clearing bookmark moved in and pitched down.
+
 ## Phone results
 (pasted benchmark results from the owner's S23 Ultra, and the governor changes made)
 

@@ -1,21 +1,27 @@
 // Adaptive quality governor (no GPU timer queries exist on Chrome Android).
 //
-// Ladder, low -> high:
-//   canopy 125 · canopy 175 · far shadow 6 s · far shadow 2 s · tufts off · tufts ½ · shafts off ·
-//   1280 · 1440 · 1600 · 1800 · 2000 (internal long side)
-// Going down lowers resolution first, then features in the brief's order (shafts, tufts,
-// far-cascade rate, canopy quads); going up walks back in reverse.
+// Resolution is a pixel count from ~1 million up to the canvas's native size (CSS size x
+// devicePixelRatio; 3088 x 1440 on the S23 Ultra), in steps of ~1.25x pixels.
+// Two modes:
+//   Smooth (60 fps target, default): ladder low -> high =
+//     [features stepped down ... ] then [1.0 MP ... native] with all features on.
+//     Going down lowers resolution first, then features in the brief's order (light shafts,
+//     grass tufts, far shadow cascade rate, canopy quads per tree).
+//   Sharp (30 fps target, favouring native resolution): ladder low -> high =
+//     [1.0 MP ... just under native] with features down, then [native, features stepped up].
+//     Going down sheds features before it gives up native resolution.
 //
 // Step down: emergency (>= 8 misses in the last 30 frames -> 2 levels) or normal
 // (>= 9 in the last 180 and >= 2 in the last 30 -> 1 level). Isolated misses are ignored.
 // Step up: no misses for 240 frames, >= 4 s since the last change, CPU < 0.6 T, and a
 // headroom check: on >= 90 Hz screens an uncapped 30-frame burst must show frame cost
-// <= 0.72 T (one step costs ~1.23x, so 0.72 * 1.23 = 0.89 < 1: no oscillation); on 60 Hz
+// <= 0.72 T (one step costs ~1.25x, so 0.72 * 1.25 = 0.9 < 1: no oscillation); on 60 Hz
 // screens a blind probe after probeWait. A probe that misses >= 3 of the next 120 frames
 // steps back and blocks that level for min(8 s * 2^n, 128 s).
-// Floor: at the lowest level with >= 5 % misses for 3 s, drop to 30 fps; retry 60 later.
+// Floor: at the lowest level with >= 5 % misses for 3 s, halve the frame target; retry later.
 
-const RES = [1280, 1440, 1600, 1800, 2000];
+export const MIN_PIXELS = 1.0e6;
+const STEP = 1.25;
 const FEATURES = [ // applied cumulatively, from the top of the feature section downward
   { label: 'shafts off', set: { shafts: false } },
   { label: 'tufts ½', set: { tufts: 0.5 } },
@@ -25,64 +31,116 @@ const FEATURES = [ // applied cumulatively, from the top of the feature section 
   { label: 'canopy 175', set: { canopyQuads: 175 / 250 } },
   { label: 'canopy 125', set: { canopyQuads: 125 / 250 } },
 ];
+const FULL = { shafts: true, tufts: 1, farShadowInterval: 0.25, canopyQuads: 1 };
 
-function buildLadder() {
-  const base = { res: RES[0], shafts: true, tufts: 1, farShadowInterval: 0.25, canopyQuads: 1 };
-  const down = [];
-  let st = { ...base };
-  for (const f of FEATURES) { st = { ...st, ...f.set }; down.push({ ...st, label: f.label }); }
-  const ladder = down.reverse();
-  for (const r of RES) ladder.push({ ...base, res: r, label: `${r}p` });
+/** Pixel-count steps from MIN_PIXELS up to native (native always the last step). */
+export function pixelSteps(nativePixels) {
+  const steps = [];
+  let p = Math.min(MIN_PIXELS, nativePixels);
+  while (p < nativePixels / 1.12) { steps.push(Math.round(p)); p *= STEP; }
+  steps.push(Math.round(nativePixels));
+  return steps;
+}
+
+const mp = (p) => `${(p / 1e6).toFixed(1)} MP`;
+
+function buildLadder(steps, sharp) {
+  const ladder = [];
+  const feats = [];
+  let st = { ...FULL };
+  for (const f of FEATURES) { st = { ...st, ...f.set }; feats.push({ ...st, label: f.label }); }
+  feats.reverse(); // most reduced first
+  const top = steps[steps.length - 1];
+  if (!sharp) {
+    for (const f of feats) ladder.push({ ...f, pixels: steps[0], label: `${mp(steps[0])} ${f.label}` });
+    for (const p of steps) ladder.push({ ...FULL, pixels: p, label: p === top ? 'native' : mp(p) });
+  } else {
+    const minF = feats[0];
+    for (const p of steps.slice(0, -1)) ladder.push({ ...minF, pixels: p, label: `${mp(p)} reduced` });
+    for (const f of feats) ladder.push({ ...f, pixels: top, label: `native ${f.label}` });
+    ladder.push({ ...FULL, pixels: top, label: 'native' });
+  }
   return ladder;
 }
 
 export class Governor {
-  constructor({ targetFps = 60, startRes = 1600, mode = 'auto', fixedRes = 0 }) {
-    this.ladder = buildLadder();
-    this.resIndex = (r) => this.ladder.findIndex((s) => s.res === r && s.label === `${r}p`);
-    this.index = this.resIndex(startRes);
-    this.startIndex = this.index;
+  constructor({ targetFps = 60, mode = 'auto', fixedRes = 0, sharp = false }) {
     this.mode = mode; // auto | max | min | fixed
-    this.fixedRes = fixedRes;
+    this.fixedRes = fixedRes; // fixed internal long side (screenshots), 0 = governed
+    this.sharp = sharp;
+    this.native = MIN_PIXELS * 2;
+    this.ladder = buildLadder(pixelSteps(this.native), sharp);
+    this.index = this.ladder.length - 1;
+    this.startIndex = this.index;
     this.miss = new Uint8Array(256);
     this.head = 0; this.frames = 0;
-    this.blockedUntil = new Float64Array(this.ladder.length);
-    this.blockCount = new Uint8Array(this.ladder.length);
+    this.blockedUntil = new Float64Array(64);
+    this.blockCount = new Uint8Array(64);
     this.clock = 0; this.lastChange = -10;
     this.ignore = 45;
-    this.probe = null; // { from, framesLeft, misses }
+    this.probe = null;
     this.probeWait = 8; this.cleanSince = 0;
     this.floorMissTime = 0; this.fpsFloorUntil = 0; this.floorBackoff = 30;
     this.steps = 0; this.stepsDown = 0; this.stepsUp = 0;
-    this.capIndex = this.ladder.length - 1;
     this.burstPending = false;
     this.cpuMed = 0;
     this.setTarget(targetFps);
     this.applyMode();
   }
 
+  get capIndex() { return this.ladder.length - 1; }
+
+  /** Rebuild the ladder for a native pixel count (resize / rotation), keeping the pixels. */
+  setNative(nativePixels) {
+    const keep = this.ladder[this.index]?.pixels ?? nativePixels;
+    this.native = nativePixels;
+    this.ladder = buildLadder(pixelSteps(nativePixels), this.sharp);
+    this.index = this.indexForPixels(keep);
+    this.blockedUntil.fill(0); this.blockCount.fill(0);
+    this.applyMode();
+  }
+
+  /** Switch Smooth (60 fps) / Sharp (30 fps, favour native). */
+  setSharp(sharp) {
+    this.sharp = sharp;
+    this.ladder = buildLadder(pixelSteps(this.native), sharp);
+    this.setTarget(sharp ? 30 : 60);
+    this.index = sharp ? this.ladder.length - 1 : this.indexForPixels(Math.min(this.native, this.calibratedPixels ?? this.native));
+    this.applyMode();
+    this.reset();
+  }
+
+  /** Highest step at or below p pixels that has every feature on (Smooth), or the best
+   *  step at or below p (Sharp, where lower resolutions carry reduced features). */
+  indexForPixels(p) {
+    let best = 0;
+    for (let i = 0; i < this.ladder.length; i++) {
+      const s = this.ladder[i];
+      const full = s.shafts && s.tufts === 1 && s.canopyQuads === 1 && s.farShadowInterval === FULL.farShadowInterval;
+      if (s.pixels <= p * 1.01 && (full || this.sharp)) best = i;
+    }
+    return best;
+  }
+
   setTarget(fps) {
     this.targetFps = fps; this.budget = 1000 / fps;
-    // Battery mode: cap at 1600 and only step down.
-    this.capIndex = fps < 50 ? this.resIndex(1600) : this.ladder.length - 1;
-    if (this.index > this.capIndex) this.index = this.capIndex;
   }
 
   applyMode() {
     if (this.mode === 'max') this.index = this.ladder.length - 1;
     else if (this.mode === 'min') this.index = 0;
+    this.index = Math.max(0, Math.min(this.ladder.length - 1, this.index));
   }
 
   get state() {
-    const s = this.ladder[this.index];
-    return this.fixedRes ? { ...s, res: this.fixedRes } : s;
+    return this.ladder[this.index];
   }
 
   label() {
     const tag = this.mode === 'auto' ? '' : ` [${this.mode}]`;
-    const floor = this.fpsFloor ? ' 30fps-floor' : '';
+    const floor = this.fpsFloor ? ' (half rate)' : '';
     const lbl = this.fixedRes ? `${this.fixedRes}p fixed` : this.state.label;
-    return `L${this.index} ${lbl}${tag}${floor}`;
+    return `${this.sharp ? 'Sharp' : 'Smooth'} L${this.index} ${lbl}${tag}${floor}`;
   }
 
   /** Ignore the next frames (start, resume, resize, teleport). */
@@ -176,7 +234,7 @@ export class Governor {
   }
 
   floorCheck(dtSec, missing) {
-    if (this.index === 0 && missing && this.targetFps > 30) {
+    if (this.index === 0 && missing && this.targetFps > 20) {
       this.floorMissTime += dtSec;
       if (this.floorMissTime > 3) {
         this.fpsFloor = true;

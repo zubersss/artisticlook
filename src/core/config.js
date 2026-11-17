@@ -14,7 +14,7 @@ export const config = {
   hud: bool('hud', false),
   res: num('res', 0), // fixed internal long side (disables resolution stepping)
   msaa: num('msaa', 4),
-  fps: num('fps', 60), // 60 or 30 (battery)
+  fps: num('fps', 60), // 60 = Smooth (default), 30 = Sharp
   overdraw: bool('overdraw', false),
   quality: q.get('quality') || 'auto', // auto | max | min
   debug: q.get('debug') || '',
@@ -22,10 +22,7 @@ export const config = {
 };
 
 export const ENGINE = {
-  minLongSide: 1280,
-  maxLongSide: 2000,
-  startLongSide: 1600,
-  maxCanvasPixels: 2.5e6, // final pass (DOM canvas) pixel cap
+  // Resolution: governed from ~1 MP up to the canvas's native pixels (src/governor/governor.js).
   near: 0.25,
   far: 40000,
   vfovDeg: 55,

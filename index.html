@@ -49,7 +49,8 @@
       <button data-act="mode" title="Walk / fly (F)"><span>Move</span><small id="lbl-mode">walk</small></button>
       <button data-act="time" title="Time of day (T)"><span>Time</span><small id="lbl-time">late pm</small></button>
       <button data-act="look" title="Lighting view (V)"><span>Look</span><small id="lbl-look">painted</small></button>
-      <button data-act="quality" title="Quality (Q)"><span>Quality</span><small id="lbl-quality">auto 60</small></button>
+      <button data-act="quality" title="Smooth / Sharp (O)"><span>Quality</span><small id="lbl-quality">Smooth 60</small></button>
+      <button data-act="photo" title="Photo at full resolution (P)"><span>Photo</span><small id="lbl-photo">native</small></button>
       <button data-act="hud" title="HUD (H)"><span>HUD</span><small id="lbl-hud">off</small></button>
       <button data-act="bench" title="Benchmark"><span>Bench</span><small id="lbl-bench">3 min</small></button>
     </div>
@@ -77,6 +78,11 @@
           <button id="bench-cancel">Cancel</button>
         </div>
       </div>
+    </div>
+
+    <div id="photo-bar" class="hidden">
+      <button id="photo-save">Save picture</button>
+      <button id="photo-back">Back</button>
     </div>
 
     <div id="bench-banner" class="hidden">Benchmark running… <span id="bench-progress"></span> <button id="bench-stop">Stop</button></div>

@@ -140,7 +140,9 @@ export class Shadows {
     if (c.index === 1) this.timeSinceFar = 0;
     // Terrain caster grid centred on the camera.
     const t = c.terrain;
-    t.material.uniforms.uGridC.value.set(Math.round(f[0] / 16) * 16, Math.round(f[2] / 16) * 16, R * 2.6, 0);
+    // Snap the grid to its own spacing so re-renders sample the same heights (no jumping edges).
+    const size = R * 2.6, step = size / (c.cfg.grid ?? 128);
+    t.material.uniforms.uGridC.value.set(Math.round(f[0] / step) * step, Math.round(f[2] / step) * step, size, 0);
     t.visible = true;
     for (const m of this.casters) m.visible = m.userData.shadowCascade === 'both' || m.userData.shadowCascade === c.index;
     for (const other of this.cascades) if (other !== c) other.terrain.visible = false;

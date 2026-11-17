@@ -28,17 +28,17 @@ export function generateDabAtlas(N = 512, opt = {}) {
     for (let cx = 0; cx < 4; cx++) {
       const near = cy < 2;
       const ox = cx * C, oy = cy * C;
-      const count = near ? 10 + rng.int(6) : 4 + rng.int(3);
+      const count = near ? 10 + rng.int(6) : 20 + rng.int(8);
       const dabs = [];
       // Place dabs inside a disc (the card is an octagon around it), avoid heavy overlap.
       for (let k = 0; k < count; k++) {
-        const r = near ? rng.range(0.085, 0.125) : rng.range(0.2, 0.3); // dab radius as fraction of cell
+        const r = near ? rng.range(0.085, 0.125) : rng.range(0.065, 0.095); // dab radius as fraction of cell
         let px = 0.5, py = 0.5, tries = 0;
         do {
           const a = rng.next() * Math.PI * 2, d = Math.sqrt(rng.next()) * (0.5 - r - 0.03);
           px = 0.5 + Math.cos(a) * d; py = 0.5 + Math.sin(a) * d;
           tries++;
-        } while (tries < 40 && dabs.some((q) => Math.hypot(q.x - px, q.y - py) < (q.r + r) * (near ? 1.0 : 0.8)));
+        } while (tries < 40 && dabs.some((q) => Math.hypot(q.x - px, q.y - py) < (q.r + r) * (near ? 1.0 : 0.85)));
         dabs.push({
           x: px, y: py, r, id: rng.next(), ang: rng.next() * Math.PI,
           star: near && rng.next() < 0.12, lobes: 3 + rng.int(3),
