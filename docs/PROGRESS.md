@@ -40,6 +40,17 @@ judging the look only; performance numbers come only from the owner's phone.
 - **Rejected / deferred:** uncapped-burst is used, but GPU fence sampling is not (allocates sync
   objects). Exact per-instance foliage sorting replaced by 8-bucket ordering (planner A).
 
+## Owner's project charter (received after stage 4)
+- Saved verbatim in `docs/CHARTER.md`; rules folded into `CLAUDE.md`; roadmap with status per
+  milestone in `docs/ROADMAP.md`; reference paintings summarised in `docs/REFERENCE_NOTES.md`;
+  asset/licence register in `docs/ASSETS.md`.
+- Fixed-decision change: the internal resolution ceiling is now the canvas's native pixel size
+  (not 2000 px); Smooth (60 fps) / Sharp (30 fps) modes and a photo mode at native resolution.
+  To be implemented in milestone 1's performance stage (9) at the latest; the governor's range
+  becomes ~1 Mpx … native.
+- The owner asked to carry on with milestone 1; phone checkpoint 1's benchmark numbers have not
+  arrived yet. Continuing with stage 5; the governor will be tuned when numbers arrive.
+
 ## Decisions and simplifications
 - Deployment: the session may only push its working branch, so the Pages workflow runs on
   pushes to `main` **and** to the working branch. The first push to the empty repository makes
